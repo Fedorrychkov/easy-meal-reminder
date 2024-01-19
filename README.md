@@ -1,3 +1,10 @@
+# Meal Reminder
+## Setting up firebase
+add package global `npm install -g firebase-tools` and use `firebase init` after it. Select => 1. Firestore; 2. Existing project; 3. Other steps use defaults. Or you can use command `firebase use your-project-name` for start using your firestore.
+
+## Manage indexes
+Your indexes saved in firebase.indexes.json and you can use command `firebase deploy --only firestore:indexes` for deploy it.
+
 <p align="center">
   <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="200" alt="Nest Logo" /></a>
 </p>
