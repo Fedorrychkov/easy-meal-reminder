@@ -1,0 +1,45 @@
+import { Inject, Injectable, Logger } from '@nestjs/common'
+import { CollectionReference } from '@google-cloud/firestore'
+import { UserDocument } from './user.document'
+
+@Injectable()
+export class UserEntity {
+  private logger: Logger = new Logger(UserEntity.name)
+
+  constructor(
+    @Inject(UserDocument.collectionName)
+    private userCollection: CollectionReference<UserDocument>,
+  ) {}
+
+  async getUser(id: string): Promise<UserDocument | null> {
+    const snapshot = await this.userCollection.doc(id).get()
+
+    if (!snapshot.exists) {
+      return null
+    } else {
+      return snapshot.data()
+    }
+  }
+
+  async createOrUpdateUser(user: UserDocument) {
+    const userDocument = await this.userCollection.doc(user.id)
+    await userDocument.set(user)
+
+    return user
+  }
+
+  getValidProperties(user: UserDocument) {
+    return {
+      id: user.id,
+      chatId: user.chatId,
+      username: user.username || null,
+      firstName: user.firstName || null,
+      lastName: user.lastName || null,
+      isPremium: user.isPremium || null,
+      isBot: user.isBot || null,
+      phone: user.phone || null,
+      createdAt: user.createdAt || null,
+      updatedAt: user.updatedAt || null,
+    }
+  }
+}
