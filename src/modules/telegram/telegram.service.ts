@@ -22,12 +22,23 @@ export class TelegramService {
   //   }
   // }
 
-  public sendMessage({ id, message, data }: { id?: string; data: TelegramBot.Message; message: string }) {
+  public sendMessage({
+    id,
+    message,
+    data,
+    options,
+  }: {
+    id?: string
+    data: TelegramBot.Message
+    message: string
+    options?: TelegramBot.SendMessageOptions
+  }) {
     try {
       const parsedId = `${data?.chat?.id}`
 
       this.telegramInstance.bot.sendMessage(parsedId, message, {
         parse_mode: 'HTML',
+        ...options,
       })
     } catch (error) {
       this.logger.warn(`Chat ${id} get error`, error)

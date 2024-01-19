@@ -1,11 +1,12 @@
-import * as dayjs from 'dayjs'
 import { Injectable } from '@nestjs/common'
 import * as TelegramBot from 'node-telegram-bot-api'
 import { UserDocument, UserEntity } from 'src/entities'
+import { baseCommands } from '../../commands'
 import { TelegramService } from '../../telegram.service'
 import { TelegramMessageHandlerType } from '../../telegram.types'
+import { MealEventMessagesIncoming } from '../mealEvent/message.constants'
 import { IScenarioInstance } from '../scenarios.types'
-import { Timestamp } from '@google-cloud/firestore'
+import { WelcomeMessagesIncoming } from './message.constants'
 
 @Injectable()
 export class WelcomeScenario implements IScenarioInstance {
@@ -44,8 +45,6 @@ ${welcomeFinish}
     const text = this.getWelcomeMessage(user, message)
 
     if (!user && message?.from) {
-      const dueDateMillis = dayjs().valueOf()
-      const createdAt = Timestamp.fromMillis(dueDateMillis)
       const { username, id, first_name, last_name, is_bot } = message?.from
       const payload = this.userEntity.getValidProperties({
         id: `${id}`,
@@ -55,10 +54,23 @@ ${welcomeFinish}
         chatId: `${id}`,
         isBot: `${is_bot}`,
         isPremium: `${(message?.from as any)?.is_premium}`,
-        createdAt,
       })
 
       await this.userEntity.createOrUpdateUser(payload)
+    }
+
+    if (Object.values(MealEventMessagesIncoming).includes(message?.text)) {
+      return
+    }
+
+    if (message?.text?.indexOf(WelcomeMessagesIncoming.start) > -1) {
+      this.telegramService.sendMessage({
+        data: message,
+        message: 'Попробуйте выбрать подходящую команду',
+        options: baseCommands,
+      })
+
+      return
     }
 
     this.telegramService.sendMessage({ data: message, message: text })

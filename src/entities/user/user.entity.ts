@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common'
-import { CollectionReference } from '@google-cloud/firestore'
+import { CollectionReference, Timestamp } from '@google-cloud/firestore'
 import { UserDocument } from './user.document'
+import { time } from 'src/helpers'
 
 @Injectable()
 export class UserEntity {
@@ -29,6 +30,9 @@ export class UserEntity {
   }
 
   getValidProperties(user: UserDocument) {
+    const dueDateMillis = time().valueOf()
+    const createdAt = Timestamp.fromMillis(dueDateMillis)
+
     return {
       id: user.id,
       chatId: user.chatId,
@@ -38,7 +42,7 @@ export class UserEntity {
       isPremium: user.isPremium || null,
       isBot: user.isBot || null,
       phone: user.phone || null,
-      createdAt: user.createdAt || null,
+      createdAt: user.createdAt || createdAt,
       updatedAt: user.updatedAt || null,
     }
   }
