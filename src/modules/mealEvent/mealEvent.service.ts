@@ -10,7 +10,7 @@ export class MealEventService {
   constructor(private readonly mealEventEntity: MealEventEntity) {}
 
   public async getTodayEvents(userId?: string) {
-    const toDate = time().endOf('day')
+    const toDate = time().tz('Europe/Moscow').endOf('day')
     const fromDate = toDate.startOf('day')
     const events = await this.mealEventEntity.findAll({
       status: [MealEventStatus.CONFIRMED],

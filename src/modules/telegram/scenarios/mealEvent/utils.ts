@@ -1,7 +1,7 @@
 import { time } from 'src/helpers'
 
 export const getTimeInfoForNotifications = () => {
-  const currentDateInstance = time()
+  const currentDateInstance = time().tz('Europe/Moscow')
 
   const currentDate = currentDateInstance.format('MM/DD/YYYY')
 

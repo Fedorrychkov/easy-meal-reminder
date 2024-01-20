@@ -124,7 +124,12 @@ export class MealEventsSchedule {
           return
         }
 
-        const diff = Math.round(time.unix((lastEvent.createdAt as any)?._seconds).diff(time()) / 1000)
+        const diff = Math.round(
+          time
+            .unix((lastEvent.createdAt as any)?._seconds)
+            .tz('Europe/Moscow')
+            .diff(time().tz('Europe/Moscow')) / 1000,
+        )
         const minutes = Math.floor(diff / 60)
 
         const isNeedToSend = minutes - -reminderPeriodInMinutes < 30
@@ -152,7 +157,10 @@ export class MealEventsSchedule {
     currentDate: string
     currentDateInstance: Dayjs
   }) {
-    const isToday = time.unix((user.createdAt as any)?._seconds).isToday()
+    const isToday = time
+      .unix((user.createdAt as any)?._seconds)
+      .tz('Europe/Moscow')
+      .isToday()
 
     if ((settings?.mealsCountPerDay && settings?.mealsCountPerDay > 0) || isToday) {
       return false
