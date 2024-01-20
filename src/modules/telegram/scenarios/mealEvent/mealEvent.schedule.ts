@@ -23,8 +23,7 @@ export class MealEventsSchedule {
     private readonly mealNotification: MealNotification,
   ) {}
 
-  // @Cron(CronExpression.EVERY_HOUR)
-  @Cron(CronExpression.EVERY_10_SECONDS)
+  @Cron(CronExpression.EVERY_HOUR)
   async checkMealsByUsersToday() {
     const users = await this.userEntity.findAll()
 
@@ -62,6 +61,82 @@ export class MealEventsSchedule {
         }
 
         await this.sendMealsCountPerDayNotification({ user, settings, currentDate, currentDateInstance })
+      }),
+    )
+  }
+
+  // EVERY 2 MINUTES
+  @Cron('0 */2 * * * *')
+  async getMealEvents() {
+    const events = await this.mealEventService.getTodayEvents()
+
+    const eventsByUsers = new Map<string, MealEventDocument[] | undefined>()
+
+    events?.forEach((event) => {
+      const definedEvents = eventsByUsers?.get(event.userId) || []
+
+      eventsByUsers.set(event.userId, [...definedEvents, event])
+    })
+
+    const userMaps = [...(eventsByUsers.entries() || [])].map(([userId, events]) => {
+      return {
+        userId,
+        events,
+      }
+    })
+
+    await Promise.allSettled(
+      userMaps?.map(async (eventByUser) => {
+        const { userId, events } = eventByUser
+        const [user, settings] = await Promise.all([
+          this.userEntity.getUser(userId),
+          this.settingsService.getByUserId(userId),
+        ])
+
+        if (!settings?.isNotificationEnabled) {
+          this.logger.log(`Пользователь ${user.id} с ником ${user.username} отключил уведомления`)
+
+          return
+        }
+
+        if (!settings?.mealsCountPerDay) {
+          this.logger.log(`Пользователь ${user.id} с ником ${user.username} не установил количество приемов пищи`)
+
+          // TODO: Добавить уведомления 1 раз в день об установке количества приемов пищи (начать уведомлять через день после регистрации)
+          return
+        }
+
+        if (events?.length >= settings?.mealsCountPerDay) {
+          this.logger.log(`Пользователь ${user.id} с ником ${user.username} уже выполнил план за день`)
+
+          return
+        }
+
+        const reversedEvents = [...events?.reverse()]
+
+        const reminderPeriodInMinutes = (mealPeriodInHour / settings?.mealsCountPerDay) * 60
+        const [lastEvent] = reversedEvents
+
+        const key = `${user.id}-${lastEvent.id}`
+        const isSended = this.notificationMealSended.get(key) || false
+
+        if (isSended) {
+          return
+        }
+
+        const diff = Math.round(time.unix((lastEvent.createdAt as any)?._seconds).diff(time()) / 1000)
+        const minutes = Math.floor(diff / 60)
+
+        const isNeedToSend = minutes - -reminderPeriodInMinutes < 30
+
+        if (isNeedToSend) {
+          await this.mealNotification.mealNotificationSend(
+            user.chatId,
+            'Не забудьте покушать! Следующий прием пищи ожидается в течении 30 минут ;)',
+          )
+
+          this.notificationMealSended.set(key, true)
+        }
       }),
     )
   }
@@ -153,80 +228,5 @@ export class MealEventsSchedule {
     this.notificationMealStartSended.set(key, currentDateInstance.valueOf())
 
     return true
-  }
-
-  @Cron(CronExpression.EVERY_MINUTE)
-  async getMealEvents() {
-    const events = await this.mealEventService.getTodayEvents()
-
-    const eventsByUsers = new Map<string, MealEventDocument[] | undefined>()
-
-    events?.forEach((event) => {
-      const definedEvents = eventsByUsers?.get(event.userId) || []
-
-      eventsByUsers.set(event.userId, [...definedEvents, event])
-    })
-
-    const userMaps = [...(eventsByUsers.entries() || [])].map(([userId, events]) => {
-      return {
-        userId,
-        events,
-      }
-    })
-
-    await Promise.allSettled(
-      userMaps?.map(async (eventByUser) => {
-        const { userId, events } = eventByUser
-        const [user, settings] = await Promise.all([
-          this.userEntity.getUser(userId),
-          this.settingsService.getByUserId(userId),
-        ])
-
-        if (!settings?.isNotificationEnabled) {
-          this.logger.log(`Пользователь ${user.id} с ником ${user.username} отключил уведомления`)
-
-          return
-        }
-
-        if (!settings?.mealsCountPerDay) {
-          this.logger.log(`Пользователь ${user.id} с ником ${user.username} не установил количество приемов пищи`)
-
-          // TODO: Добавить уведомления 1 раз в день об установке количества приемов пищи (начать уведомлять через день после регистрации)
-          return
-        }
-
-        if (events?.length >= settings?.mealsCountPerDay) {
-          this.logger.log(`Пользователь ${user.id} с ником ${user.username} уже выполнил план за день`)
-
-          return
-        }
-
-        const reversedEvents = [...events?.reverse()]
-
-        const reminderPeriodInMinutes = (mealPeriodInHour / settings?.mealsCountPerDay) * 60
-        const [lastEvent] = reversedEvents
-
-        const key = `${user.id}-${lastEvent.id}`
-        const isSended = this.notificationMealSended.get(key) || false
-
-        if (isSended) {
-          return
-        }
-
-        const diff = Math.round(time.unix((lastEvent.createdAt as any)?._seconds).diff(time()) / 1000)
-        const minutes = Math.floor(diff / 60)
-
-        const isNeedToSend = minutes - -reminderPeriodInMinutes < 30
-
-        if (isNeedToSend) {
-          await this.mealNotification.mealNotificationSend(
-            user.chatId,
-            'Не забудьте покушать! Следующий прием пищи ожидается в течении 30 минут ;)',
-          )
-
-          this.notificationMealSended.set(key, true)
-        }
-      }),
-    )
   }
 }
