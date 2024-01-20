@@ -55,14 +55,14 @@ export class SettingsScenario implements IScenarioInstance {
       const reminderPeriodInHour = mealPeriodInHour / count
 
       const isNeedInfoAboutReminds = count > 1 && isValidNumber
-      const periodInMinutes = reminderPeriodInHour * 60
+      const periodInMinutes = parseInt(`${reminderPeriodInHour * 60}`)
       const reminderPeriodText = isNeedInfoAboutReminds
-        ? `Судя по выбранному количеству приемов в день, вам нужно кушать каждые ${periodInMinutes} минут`
+        ? `Судя по выбранному количеству приемов в день, вам нужно кушать каждые ~${periodInMinutes} минут`
         : ''
 
       const reminderNotificationText =
         isNeedInfoAboutReminds && settings?.isNotificationEnabled
-          ? `Вы будете получать уведомления за 30 минут каждые ${periodInMinutes} минут`
+          ? `Вы будете получать уведомления, примерно, за 30 минут каждые ~${periodInMinutes} минут`
           : ''
 
       this.telegramService.sendMessage({
