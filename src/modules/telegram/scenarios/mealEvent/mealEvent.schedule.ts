@@ -7,6 +7,7 @@ import { MealEventService } from 'src/modules/mealEvent'
 import { mealPeriodInHour, SettingsService } from 'src/modules/settings'
 import { settingsCommands } from '../../commands/settings'
 import { MealNotification } from './mealEvent.notification'
+import { getTimeInfoForNotifications } from './utils'
 
 @Injectable()
 export class MealEventsSchedule {
@@ -34,14 +35,7 @@ export class MealEventsSchedule {
           this.settingsService.getByUserId(user.id),
         ])
 
-        const currentDateInstance = time()
-
-        const currentDate = currentDateInstance.format('MM/DD/YYYY')
-
-        const formattedStartNotificationTime = '10:00:00'
-        const formattedCurrentNotificationDatetime = `${currentDate} ${formattedStartNotificationTime}`
-
-        const isNeedToPushNotification = time(formattedCurrentNotificationDatetime).isBefore(currentDateInstance)
+        const { isNeedToPushNotification, currentDate, currentDateInstance } = getTimeInfoForNotifications()
 
         // Если время еще не 10 утра (по мск по сути) или нотификации выключены, то уведомления не посылаем.
         if (!isNeedToPushNotification || !settings?.isNotificationEnabled) {
@@ -109,6 +103,12 @@ export class MealEventsSchedule {
         if (events?.length >= settings?.mealsCountPerDay) {
           this.logger.log(`Пользователь ${user.id} с ником ${user.username} уже выполнил план за день`)
 
+          return
+        }
+
+        const { isNeedToPushNotification } = getTimeInfoForNotifications()
+
+        if (!isNeedToPushNotification) {
           return
         }
 
