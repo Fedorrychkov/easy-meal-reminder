@@ -1,0 +1,65 @@
+name: Production Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+permissions: write-all
+
+jobs:
+  # action instruction https://dev.to/kenessajr/deploy-a-react-app-to-digitalocean-using-github-actions-and-docker-4pln
+  api:
+    runs-on: ubuntu-latest
+    steps:
+      - name: ⬇️ Checkout repo
+        uses: actions/checkout@v2
+
+      - name: ⎔ Setup node
+        uses: actions/setup-node@v2
+        with:
+          node-version: 18
+
+      - name: 📥 Install dependencies
+        run: |
+          npm install --legacy-peer-deps
+
+      - name: Create env and service-account.json files
+        run: |
+          echo '${{ secrets.ENV_PROD }}' >> .env
+
+          echo '${{ secrets.SERVICE_ACCOUNT_JSON }}' >> service-account.json
+
+      - name: 🚀 Build project
+        run: npm run build:prod
+
+      - name: 🚀 Publish Api to Github Packages Registry
+        uses: elgohr/Publish-Docker-Github-Action@master
+        with:
+          name: fedorrychkov/easy-meal-reminder/easy-meal-reminder-prod
+          # workdir: apps/api
+          registry: docker.pkg.github.com
+          username: ${{ secrets.GH_USERNAME }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          dockerfile: Dockerfile-prod.api
+          tags: latest
+
+      - name: 🚀 Pull packages in DigitalOcean server
+        uses: appleboy/ssh-action@master
+        env:
+            GH_USERNAME: ${{ secrets.GH_USERNAME }}
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          host: ${{ secrets.PROD_API_HOST }}
+          username: ${{ secrets.PROD_API_USERNAME }}
+          password: ${{ secrets.PROD_API_PASSWORD }}
+          port: 22
+          envs: GH_USERNAME, GITHUB_TOKEN
+          script: |
+            docker system prune -a -f
+            docker stop $(docker ps -a -q)
+            docker rm -f $(docker ps -a -q)
+            docker network create mynetwork
+            docker login docker.pkg.github.com -u $GH_USERNAME -p $GITHUB_TOKEN
+            docker pull docker.pkg.github.com/fedorrychkov/easy-meal-reminder/easy-meal-reminder-prod:latest
+            docker run --restart=on-failure -dit --name nestjs-container -p 8080:8080 --network mynetwork docker.pkg.github.com/fedorrychkov/easy-meal-reminder/easy-meal-reminder-prod:latest
