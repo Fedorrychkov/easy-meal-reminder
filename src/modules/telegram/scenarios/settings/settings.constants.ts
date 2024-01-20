@@ -1,0 +1,38 @@
+import { CommandType } from '../scenarios.types'
+
+export const availableMealCounts = [1, 2, 3, 4, 5, 6, 7, 8]
+
+export const SettingMealsMessageIncomingCount: Record<string, string> = availableMealCounts
+  ?.map((count) => ({ count, text: `У меня будет ${count} приемов пищи в день` }))
+  .reduce((all, item) => {
+    return {
+      ...all,
+      [`mealCount_${item.count}`]: item.text,
+    }
+  }, {})
+
+export const SettingsMessagesIncoming = {
+  settings: '/settings',
+  main: 'На главную',
+  ...SettingMealsMessageIncomingCount,
+}
+
+export const settingsMealCountCommands: CommandType = Object.entries(SettingMealsMessageIncomingCount).reduce(
+  (all, [key, text]) => ({
+    ...all,
+    [key]: {
+      text,
+    },
+  }),
+  {},
+)
+
+export const SettingsBaseCommands: CommandType = {
+  settings: {
+    text: SettingsMessagesIncoming.settings,
+  },
+  main: {
+    text: SettingsMessagesIncoming.main,
+  },
+  ...settingsMealCountCommands,
+}

@@ -1,21 +1,32 @@
 import { Module } from '@nestjs/common'
-import { MealEventEntity, UserEntity } from 'src/entities'
-import { WelcomeScenario, MealScenario } from './scenarios'
+import { UserEntity } from 'src/entities'
+import { MealEventModule } from '../mealEvent'
+import { SettingsModule } from '../settings'
+import { WelcomeScenario, MealScenario, MealEventsSchedule } from './scenarios'
+import { SettingsScenario } from './scenarios/settings'
 import { TelegramInstance } from './telegram.instance'
 import { TelegramListener } from './telegram.listener'
 import { TelegramService } from './telegram.service'
 
 @Module({
-  imports: [],
+  imports: [MealEventModule, SettingsModule],
   controllers: [],
   providers: [
+    // Entities
     UserEntity,
-    MealEventEntity,
+
+    // Services
     TelegramInstance,
     TelegramListener,
     TelegramService,
+
+    // Scenarios
     WelcomeScenario,
     MealScenario,
+    SettingsScenario,
+
+    // Schedules
+    MealEventsSchedule,
   ],
   exports: [],
 })

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common'
-import { WelcomeScenario } from './scenarios'
+import { SettingsScenario, WelcomeScenario } from './scenarios'
 import { MealScenario } from './scenarios/mealEvent'
 import { TelegramInstance } from './telegram.instance'
 import { TelegramMessageHandlerType } from './telegram.types'
@@ -13,8 +13,13 @@ export class TelegramListener {
     private readonly telegramInstance: TelegramInstance,
     private readonly welcomeScenario: WelcomeScenario,
     private readonly mealScenario: MealScenario,
+    private readonly settingsScenario: SettingsScenario,
   ) {
-    this.handlers = [...this.welcomeScenario.messageHandlers, ...this.mealScenario.messageHandlers]
+    this.handlers = [
+      ...this.welcomeScenario.messageHandlers,
+      ...this.mealScenario.messageHandlers,
+      ...this.settingsScenario.messageHandlers,
+    ]
 
     this.init()
   }

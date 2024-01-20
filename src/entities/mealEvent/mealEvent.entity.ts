@@ -1,7 +1,9 @@
+import firebase from 'firebase-admin'
 import { Inject, Injectable, Logger } from '@nestjs/common'
 import { CollectionReference, Timestamp } from '@google-cloud/firestore'
 import { MealEventDocument } from './mealEvent.document'
 import { getUniqueId, time } from 'src/helpers'
+import { MealEventFilterOptions } from './dto'
 
 @Injectable()
 export class MealEventEntity {
@@ -27,6 +29,42 @@ export class MealEventEntity {
     await document.set(event)
 
     return event
+  }
+
+  private findAllGenerator(options?: MealEventFilterOptions) {
+    const collectionRef = this.mealEventCollection
+    let query: firebase.firestore.Query<MealEventDocument> = collectionRef
+
+    if (options?.status) {
+      const optionStr = !Array.isArray(options?.status) ? '==' : 'in'
+      query = query.where('status', optionStr, options.status)
+    }
+
+    if (options?.fromDate) {
+      query = query.where('createdAt', '>=', options?.fromDate)
+    }
+
+    if (options?.toDate) {
+      query = query.where('createdAt', '<=', options?.toDate)
+    }
+
+    if (options?.userId) {
+      query = query.where('userId', '==', options?.userId)
+    }
+
+    return query
+  }
+
+  async findAll(options?: MealEventFilterOptions): Promise<MealEventDocument[]> {
+    const list: MealEventDocument[] = []
+    let query = this.findAllGenerator(options)
+    const { createdAtOrderBy = 'desc' } = options
+
+    query = query.orderBy('createdAt', createdAtOrderBy)
+    const snapshot = await query.get()
+    snapshot.forEach((doc) => list.push(doc.data()))
+
+    return list
   }
 
   getValidProperties(event: MealEventDocument) {

@@ -7,6 +7,7 @@ import { TelegramMessageHandlerType } from '../../telegram.types'
 import { MealEventMessagesIncoming } from '../mealEvent/message.constants'
 import { IScenarioInstance } from '../scenarios.types'
 import { WelcomeMessagesIncoming } from './message.constants'
+import { SettingsMessagesIncoming } from '../settings/settings.constants'
 
 @Injectable()
 export class WelcomeScenario implements IScenarioInstance {
@@ -59,7 +60,11 @@ ${welcomeFinish}
       await this.userEntity.createOrUpdateUser(payload)
     }
 
-    if (Object.values(MealEventMessagesIncoming).includes(message?.text)) {
+    if (
+      Object.values({ ...MealEventMessagesIncoming, ...WelcomeMessagesIncoming, ...SettingsMessagesIncoming }).includes(
+        message?.text,
+      )
+    ) {
       return
     }
 
@@ -70,10 +75,10 @@ ${welcomeFinish}
         options: baseCommands,
       })
 
-      return
+      return { isFinal: true }
     }
 
-    this.telegramService.sendMessage({ data: message, message: text })
+    this.telegramService.sendMessage({ data: message, message: text, options: baseCommands })
 
     return { isFinal: true }
   }
