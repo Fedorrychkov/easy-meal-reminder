@@ -41,18 +41,20 @@ export class SettingsScenario implements IScenarioInstance {
 
       const isValidNumber = !Number.isNaN(count) ? availableMealCounts?.findIndex((item) => count === item) > -1 : false
 
-      const payload = this.settingsEntity.getValidProperties({
-        ...settings,
-        userId: user.id,
-        mealsCountPerDay: count,
-      })
+      if (isValidNumber) {
+        const payload = this.settingsEntity.getValidProperties({
+          ...settings,
+          userId: user.id,
+          mealsCountPerDay: count,
+        })
 
-      await this.settingsService.createOrUpdate(payload)
+        await this.settingsService.createOrUpdate(payload)
+      }
 
       const mealRegisteredText = `За сегодня было зарегистрировано ${events?.length} приемов пищи`
-      const reminderPeriodInHour = mealPeriodInHour / settings?.mealsCountPerDay
+      const reminderPeriodInHour = mealPeriodInHour / count
 
-      const isNeedInfoAboutReminds = count > 1
+      const isNeedInfoAboutReminds = count > 1 && isValidNumber
       const periodInMinutes = reminderPeriodInHour * 60
       const reminderPeriodText = isNeedInfoAboutReminds
         ? `Судя по выбранному количеству приемов в день, вам нужно кушать каждые ${periodInMinutes} минут`
