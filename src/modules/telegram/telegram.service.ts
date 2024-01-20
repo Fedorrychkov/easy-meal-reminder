@@ -8,20 +8,6 @@ export class TelegramService {
 
   constructor(private readonly telegramInstance: TelegramInstance) {}
 
-  // public async sendAll(message: string) {
-  //   if (!this.bot) {
-  //     this.logger.warn('Telegram bot is not available')
-
-  //     return
-  //   }
-
-  //   this.logger.log('[Telegram log, Before Send]', message)
-
-  //   for await (const id of [...this.ids, ...this.temporaryIds]) {
-  //     this.send(id, message)
-  //   }
-  // }
-
   public sendMessage({
     id,
     message,
@@ -29,12 +15,18 @@ export class TelegramService {
     options,
   }: {
     id?: string
-    data: TelegramBot.Message
+    data?: TelegramBot.Message
     message: string
     options?: TelegramBot.SendMessageOptions
   }) {
     try {
-      const parsedId = `${data?.chat?.id}`
+      const parsedId = `${data?.chat?.id || id}`
+
+      if (!parsedId) {
+        this.logger.error('Unavailable chat id to send message')
+
+        return
+      }
 
       this.telegramInstance.bot.sendMessage(parsedId, message, {
         parse_mode: 'HTML',

@@ -2,7 +2,8 @@ import { Injectable } from '@nestjs/common'
 import * as TelegramBot from 'node-telegram-bot-api'
 import { SettingsEntity, UserEntity } from 'src/entities'
 import { getNumber } from 'src/helpers'
-import { SettingsService } from 'src/modules/settings'
+import { MealEventService } from 'src/modules/mealEvent'
+import { mealPeriodInHour, SettingsService } from 'src/modules/settings'
 import { baseCommands } from '../../commands'
 import { settingsCommands } from '../../commands/settings'
 import { TelegramService } from '../../telegram.service'
@@ -18,6 +19,7 @@ export class SettingsScenario implements IScenarioInstance {
     private readonly telegramService: TelegramService,
     private readonly userEntity: UserEntity,
     private readonly settingsService: SettingsService,
+    private readonly mealEventService: MealEventService,
     private readonly settingsEntity: SettingsEntity,
   ) {
     this.messageHandlers = [this.settings.bind(this)]
@@ -32,7 +34,10 @@ export class SettingsScenario implements IScenarioInstance {
 
     if (Object.values(SettingMealsMessageIncomingCount).includes(message?.text)) {
       const count = parseFloat(getNumber(message?.text))
-      const settings = await this.settingsService.getByUserId(user.id)
+      const [settings, events] = await Promise.all([
+        this.settingsService.getByUserId(user.id),
+        await this.mealEventService.getTodayEvents(),
+      ])
 
       const isValidNumber = !Number.isNaN(count) ? availableMealCounts?.findIndex((item) => count === item) > -1 : false
 
@@ -44,9 +49,25 @@ export class SettingsScenario implements IScenarioInstance {
 
       await this.settingsService.createOrUpdate(payload)
 
+      const mealRegisteredText = `За сегодня было зарегистрировано ${events?.length} приемов пищи`
+      const reminderPeriodInHour = mealPeriodInHour / settings?.mealsCountPerDay
+
+      const isNeedInfoAboutReminds = count > 1
+      const periodInMinutes = reminderPeriodInHour * 60
+      const reminderPeriodText = isNeedInfoAboutReminds
+        ? `Судя по выбранному количеству приемов в день, вам нужно кушать каждые ${periodInMinutes} минут`
+        : ''
+
+      const reminderNotificationText =
+        isNeedInfoAboutReminds && settings?.isNotificationEnabled
+          ? `Вы будете получать уведомления за 30 минут каждые ${periodInMinutes} минут`
+          : ''
+
       this.telegramService.sendMessage({
         data: message,
-        message: isValidNumber ? `Количество приемов в ${count}/день успешно установлено` : 'Попробуйте еще раз',
+        message: isValidNumber
+          ? `Количество приемов в ${count}/день успешно установлено\n\n${mealRegisteredText}\n\n${reminderPeriodText}\n\n${reminderNotificationText}`
+          : 'Попробуйте еще раз',
         options: isValidNumber ? baseCommands : settingsCommands,
       })
 
@@ -63,17 +84,52 @@ export class SettingsScenario implements IScenarioInstance {
       return { isFinal: true }
     }
 
-    // if (message?.text?.indexOf(WelcomeMessagesIncoming.start) > -1) {
-    //   this.telegramService.sendMessage({
-    //     data: message,
-    //     message: 'Попробуйте выбрать подходящую команду',
-    //     options: baseCommands,
-    //   })
+    if (SettingsMessagesIncoming.mealRemindsDrop === message?.text) {
+      const settings = await this.settingsService.getByUserId(user.id)
 
-    //   return
-    // }
+      const payload = this.settingsEntity.getValidProperties({
+        ...settings,
+        userId: user.id,
+        isNotificationEnabled: false,
+      })
 
-    this.telegramService.sendMessage({ data: message, message: 'test', options: settingsCommands })
+      await this.settingsService.createOrUpdate(payload)
+
+      this.telegramService.sendMessage({
+        data: message,
+        message: `Уведомления отключены, включить можете нажав на кнопку или написав "${SettingsMessagesIncoming.mealRemindsStart}"`,
+        options: baseCommands,
+      })
+
+      return { isFinal: true }
+    }
+
+    if (SettingsMessagesIncoming.mealRemindsStart === message?.text) {
+      const settings = await this.settingsService.getByUserId(user.id)
+
+      const payload = this.settingsEntity.getValidProperties({
+        ...settings,
+        userId: user.id,
+        isNotificationEnabled: true,
+      })
+
+      await this.settingsService.createOrUpdate(payload)
+
+      this.telegramService.sendMessage({
+        data: message,
+        message: `Уведомления включены, отключить можете нажав на кнопку или написав "${SettingsMessagesIncoming.mealRemindsDrop}"`,
+        options: baseCommands,
+      })
+
+      return { isFinal: true }
+    }
+
+    this.telegramService.sendMessage({
+      data: message,
+      message:
+        'В настройках вы можете указать количество приемов пищи, для управления уведомления перейдите на главную',
+      options: settingsCommands,
+    })
 
     return { isFinal: true }
   }

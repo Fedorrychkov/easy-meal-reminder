@@ -1,3 +1,4 @@
+import firebase from 'firebase-admin'
 import { Inject, Injectable, Logger } from '@nestjs/common'
 import { CollectionReference, Timestamp } from '@google-cloud/firestore'
 import { UserDocument } from './user.document'
@@ -27,6 +28,24 @@ export class UserEntity {
     await userDocument.set(user)
 
     return user
+  }
+
+  private findAllGenerator() {
+    const collectionRef = this.userCollection
+    const query: firebase.firestore.Query<UserDocument> = collectionRef
+
+    return query
+  }
+
+  async findAll(): Promise<UserDocument[]> {
+    const list: UserDocument[] = []
+    let query = this.findAllGenerator()
+
+    query = query.orderBy('createdAt', 'desc')
+    const snapshot = await query.get()
+    snapshot.forEach((doc) => list.push(doc.data()))
+
+    return list
   }
 
   getValidProperties(user: UserDocument) {

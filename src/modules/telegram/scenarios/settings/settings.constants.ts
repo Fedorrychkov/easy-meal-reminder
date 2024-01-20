@@ -14,6 +14,8 @@ export const SettingMealsMessageIncomingCount: Record<string, string> = availabl
 export const SettingsMessagesIncoming = {
   settings: '/settings',
   main: 'На главную',
+  mealRemindsDrop: 'Остановить напоминания',
+  mealRemindsStart: 'Запустить напоминания',
   ...SettingMealsMessageIncomingCount,
 }
 
@@ -33,6 +35,12 @@ export const SettingsBaseCommands: CommandType = {
   },
   main: {
     text: SettingsMessagesIncoming.main,
+  },
+  mealRemindsDrop: {
+    text: SettingsMessagesIncoming.mealRemindsDrop,
+  },
+  mealRemindsStart: {
+    text: SettingsMessagesIncoming.mealRemindsStart,
   },
   ...settingsMealCountCommands,
 }

@@ -5,7 +5,7 @@ export const baseCommands = {
   reply_markup: {
     keyboard: [
       [MealBaseCommands.mealStart],
-      [MealBaseCommands.mealRemindsDrop, MealBaseCommands.mealRemindsStart],
+      [SettingsBaseCommands.mealRemindsDrop, SettingsBaseCommands.mealRemindsStart],
       [SettingsBaseCommands.settings],
     ],
   },

@@ -9,6 +9,7 @@ export class SettingsDocument {
   id: string
   userId: string
   mealsCountPerDay?: number | null
+  isNotificationEnabled?: boolean | null
   createdAt?: Timestamp | null
   updatedAt?: Timestamp | null
 }

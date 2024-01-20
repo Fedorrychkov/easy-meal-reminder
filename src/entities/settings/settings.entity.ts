@@ -51,6 +51,8 @@ export class SettingsEntity {
       id: setting.id || getUniqueId(),
       userId: setting.userId,
       mealsCountPerDay: setting.mealsCountPerDay || null,
+      isNotificationEnabled:
+        typeof setting.isNotificationEnabled === 'undefined' ? true : setting.isNotificationEnabled,
       createdAt: setting.createdAt || createdAt,
       updatedAt: setting.updatedAt || null,
     }
