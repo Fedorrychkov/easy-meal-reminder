@@ -31,7 +31,7 @@ export class MealEventsSchedule {
     await Promise.allSettled(
       users?.map(async (user) => {
         const [events, settings] = await Promise.all([
-          this.mealEventService.getTodayEvents(),
+          this.mealEventService.getTodayEvents(user.id),
           this.settingsService.getByUserId(user.id),
         ])
 
