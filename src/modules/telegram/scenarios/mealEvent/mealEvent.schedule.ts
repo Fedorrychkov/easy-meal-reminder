@@ -24,7 +24,8 @@ export class MealEventsSchedule {
     private readonly mealNotification: MealNotification,
   ) {}
 
-  @Cron(CronExpression.EVERY_HOUR)
+  // @Cron(CronExpression.EVERY_HOUR)
+  @Cron(CronExpression.EVERY_MINUTE)
   async checkMealsByUsersToday() {
     const users = await this.userEntity.findAll()
 
@@ -36,6 +37,14 @@ export class MealEventsSchedule {
         ])
 
         const { isNeedToPushNotification, currentDate, currentDateInstance } = getTimeInfoForNotifications()
+
+        this.logger.log(
+          `[checkMealsByUsersToday]: Пользователь ${user.id} с ником ${user.username} пока не может получать уведомления`,
+          {
+            isNeedToPushNotification,
+            isNotificationEnabled: settings?.isNotificationEnabled,
+          },
+        )
 
         // Если время еще не 10 утра (по мск по сути) или нотификации выключены, то уведомления не посылаем.
         if (!isNeedToPushNotification || !settings?.isNotificationEnabled) {
@@ -88,20 +97,22 @@ export class MealEventsSchedule {
         ])
 
         if (!settings?.isNotificationEnabled) {
-          this.logger.log(`Пользователь ${user.id} с ником ${user.username} отключил уведомления`)
+          this.logger.log(`[getMealEvents]: Пользователь ${user.id} с ником ${user.username} отключил уведомления`)
 
           return
         }
 
         if (!settings?.mealsCountPerDay) {
-          this.logger.log(`Пользователь ${user.id} с ником ${user.username} не установил количество приемов пищи`)
+          this.logger.log(
+            `[getMealEvents]: Пользователь ${user.id} с ником ${user.username} не установил количество приемов пищи`,
+          )
 
           // TODO: Добавить уведомления 1 раз в день об установке количества приемов пищи (начать уведомлять через день после регистрации)
           return
         }
 
         if (events?.length >= settings?.mealsCountPerDay) {
-          this.logger.log(`Пользователь ${user.id} с ником ${user.username} уже выполнил план за день`)
+          this.logger.log(`[getMealEvents]: Пользователь ${user.id} с ником ${user.username} уже выполнил план за день`)
 
           return
         }
@@ -109,6 +120,13 @@ export class MealEventsSchedule {
         const { isNeedToPushNotification } = getTimeInfoForNotifications()
 
         if (!isNeedToPushNotification) {
+          this.logger.log(
+            `[getMealEvents]: Пользователь ${user.id} с ником ${user.username} пока не может получать уведомления`,
+            {
+              isNeedToPushNotification,
+            },
+          )
+
           return
         }
 
@@ -121,6 +139,13 @@ export class MealEventsSchedule {
         const isSended = this.notificationMealSended.get(key) || false
 
         if (isSended) {
+          this.logger.log(
+            `[getMealEvents]: Пользователь ${user.id} с ником ${user.username} уже получал уведомление о следующем приеме пищи`,
+            {
+              key,
+            },
+          )
+
           return
         }
 
@@ -134,6 +159,17 @@ export class MealEventsSchedule {
 
         const isNeedToSend = minutes - -reminderPeriodInMinutes < 30
 
+        if (!isNeedToSend) {
+          this.logger.log(
+            `[getMealEvents]: Пользователю ${user.id} с ником ${user.username} пока рано отправлять уведомление`,
+            {
+              minutes,
+              reminderPeriodInMinutes,
+              diff: minutes - -reminderPeriodInMinutes,
+            },
+          )
+        }
+
         if (isNeedToSend) {
           await this.mealNotification.mealNotificationSend(
             user.chatId,
@@ -144,50 +180,6 @@ export class MealEventsSchedule {
         }
       }),
     )
-  }
-
-  private async sendMealsCountPerDayNotification({
-    user,
-    settings,
-    currentDate,
-    currentDateInstance,
-  }: {
-    user: UserDocument
-    settings: SettingsDocument
-    currentDate: string
-    currentDateInstance: Dayjs
-  }) {
-    const isToday = time
-      .unix((user.createdAt as any)?._seconds)
-      .tz('Europe/Moscow')
-      .isToday()
-
-    if ((settings?.mealsCountPerDay && settings?.mealsCountPerDay > 0) || isToday) {
-      return false
-    }
-
-    const key = `${user.id}-${currentDate}`
-
-    const lastTodayNotification = this.notificationMealCountPerDatSended.get(key)
-
-    if (lastTodayNotification) {
-      this.logger.log(
-        `Пользователь ${user.id} с ником ${user.username} уже получал уведомления о необходимости настроить интервалы еды`,
-      )
-
-      return false
-    }
-
-    const countSettingsText =
-      'Для корректной работы, вам нужно настроить количество приемов еды, чтобы я мог уведомлять вас заблоговременно!\n\n'
-
-    const remindsInfoText = `${countSettingsText}Обратите внимание, я начинаю уведомления от последнего зарегестрированного приема пищи`
-
-    await this.mealNotification.mealNotificationSend(user.chatId, `${remindsInfoText}`, settingsCommands)
-
-    this.notificationMealCountPerDatSended.set(key, currentDateInstance.valueOf())
-
-    return true
   }
 
   private async sendMealStartNotification({
@@ -208,7 +200,7 @@ export class MealEventsSchedule {
     // Не нужно отправлять уведомления о напоминании еды, если прием пищи уже был зарегистрирован
     if (events?.length > 0) {
       this.logger.log(
-        `Пользователь ${user.id} с ником ${user.username} уже зарегистрировал ${events.length} приемов пищи за сегодня ${currentDate}`,
+        `[sendMealStartNotification]: Пользователь ${user.id} с ником ${user.username} уже зарегистрировал ${events.length} приемов пищи за сегодня ${currentDate}`,
       )
 
       return false
@@ -217,7 +209,9 @@ export class MealEventsSchedule {
     const lastTodayNotification = this.notificationMealStartSended.get(key)
 
     if (lastTodayNotification) {
-      this.logger.log(`Пользователь ${user.id} с ником ${user.username} уже получал уведомления о начале еды`)
+      this.logger.log(
+        `[sendMealStartNotification]: Пользователь ${user.id} с ником ${user.username} уже получал уведомления о начале еды`,
+      )
 
       return false
     }
@@ -234,6 +228,58 @@ export class MealEventsSchedule {
     )
 
     this.notificationMealStartSended.set(key, currentDateInstance.valueOf())
+
+    return true
+  }
+
+  private async sendMealsCountPerDayNotification({
+    user,
+    settings,
+    currentDate,
+    currentDateInstance,
+  }: {
+    user: UserDocument
+    settings: SettingsDocument
+    currentDate: string
+    currentDateInstance: Dayjs
+  }) {
+    const isToday = time
+      .unix((user.createdAt as any)?._seconds)
+      .tz('Europe/Moscow')
+      .isToday()
+
+    this.logger.log(
+      `[sendMealsCountPerDayNotification]: Пользователь ${user.id} с ником ${user.username} пока не может получать уведомления`,
+      {
+        isToday,
+        mealsCountPerDay: settings?.mealsCountPerDay,
+      },
+    )
+
+    if ((settings?.mealsCountPerDay && settings?.mealsCountPerDay > 0) || isToday) {
+      return false
+    }
+
+    const key = `${user.id}-${currentDate}`
+
+    const lastTodayNotification = this.notificationMealCountPerDatSended.get(key)
+
+    if (lastTodayNotification) {
+      this.logger.log(
+        `[sendMealsCountPerDayNotification]: Пользователь ${user.id} с ником ${user.username} уже получал уведомления о необходимости настроить интервалы еды`,
+      )
+
+      return false
+    }
+
+    const countSettingsText =
+      'Для корректной работы, вам нужно настроить количество приемов еды, чтобы я мог уведомлять вас заблоговременно!\n\n'
+
+    const remindsInfoText = `${countSettingsText}Обратите внимание, я начинаю уведомления от последнего зарегестрированного приема пищи`
+
+    await this.mealNotification.mealNotificationSend(user.chatId, `${remindsInfoText}`, settingsCommands)
+
+    this.notificationMealCountPerDatSended.set(key, currentDateInstance.valueOf())
 
     return true
   }
