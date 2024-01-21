@@ -37,17 +37,17 @@ export class MealEventsSchedule {
 
         const { isNeedToPushNotification, currentDate, currentDateInstance } = getTimeInfoForNotifications()
 
-        this.logger.log(
-          `[checkMealsByUsersToday]: Пользователь ${user.id} с ником ${user.username} пока не может получать уведомления`,
-          {
-            isNeedToPushNotification,
-            isNotificationEnabled: settings?.isNotificationEnabled,
-            currentDatetime: currentDateInstance.format('DD/MM/YYYY HH:mm:ss'),
-          },
-        )
-
         // Если время еще не 10 утра (по мск по сути) или нотификации выключены, то уведомления не посылаем.
         if (!isNeedToPushNotification || !settings?.isNotificationEnabled) {
+          this.logger.log(
+            `[checkMealsByUsersToday]: Пользователь ${user.id} с ником ${user.username} пока не может получать уведомления`,
+            {
+              isNeedToPushNotification,
+              isNotificationEnabled: settings?.isNotificationEnabled,
+              currentDatetime: currentDateInstance.format('DD/MM/YYYY HH:mm:ss'),
+            },
+          )
+
           return
         }
 
