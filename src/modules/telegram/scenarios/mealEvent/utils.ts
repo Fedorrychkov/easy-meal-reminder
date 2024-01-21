@@ -11,8 +11,8 @@ export const getTimeInfoForNotifications = () => {
   const formattedCurrentForEndNotificationDatetime = `${currentDate} ${formattedEndNotificationTime}`
 
   const isNeedToPushNotification =
-    time(formattedCurrentForStartNotificationDatetime).isBefore(currentDateInstance) &&
-    time(formattedCurrentForEndNotificationDatetime).isAfter(currentDateInstance)
+    time(formattedCurrentForStartNotificationDatetime).tz('Europe/Moscow').isBefore(currentDateInstance) &&
+    time(formattedCurrentForEndNotificationDatetime).tz('Europe/Moscow').isAfter(currentDateInstance)
 
   return { isNeedToPushNotification, currentDate, currentDateInstance }
 }
