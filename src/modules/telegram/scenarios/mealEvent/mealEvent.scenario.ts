@@ -3,7 +3,7 @@ import * as TelegramBot from 'node-telegram-bot-api'
 import { MealEventEntity, MealEventStatus, UserDocument, UserEntity } from 'src/entities'
 import { getUniqueId } from 'src/helpers'
 import { MealEventService } from 'src/modules/mealEvent'
-import { SettingsService } from 'src/modules/settings'
+import { mealPeriodInHour, SettingsService } from 'src/modules/settings'
 import { baseCommands } from '../../commands'
 import { settingsCommands } from '../../commands/settings'
 import { TelegramService } from '../../telegram.service'
@@ -63,8 +63,17 @@ export class MealScenario implements IScenarioInstance {
     }
 
     const isNeedToAddMealsCount = !settings?.mealsCountPerDay
+    const isNeedInfoAboutReminds = settings?.mealsCountPerDay > 1
+    const reminderPeriodInHour = mealPeriodInHour / settings?.mealsCountPerDay
+
+    const periodInMinutes = parseInt(`${reminderPeriodInHour * 60}`)
+
     const successText = `Прием пищи успешно сохранен ${countSum}/${mealCountFromSettings} ${
-      muchText ? '' : `, следующий прием еды через ${1}, напомним за 30 минут`
+      muchText
+        ? ''
+        : `${
+            isNeedInfoAboutReminds ? `, следующий прием еды через ${periodInMinutes} минут, напомним за 30 минут` : ''
+          }`
     }`
 
     const needAddMealText = isNeedToAddMealsCount
