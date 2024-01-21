@@ -43,6 +43,7 @@ export class MealEventsSchedule {
           {
             isNeedToPushNotification,
             isNotificationEnabled: settings?.isNotificationEnabled,
+            currentDatetime: currentDateInstance.format('DD/MM/YYYY HH:mm:ss'),
           },
         )
 
