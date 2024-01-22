@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common'
 import * as TelegramBot from 'node-telegram-bot-api'
 import { MealEventEntity, MealEventStatus, UserDocument, UserEntity } from 'src/entities'
-import { getUniqueId } from 'src/helpers'
+import { declOfNum, getUniqueId, interpolate } from 'src/helpers'
+import { MESSAGES, declWords } from 'src/messages'
 import { MealEventService } from 'src/modules/mealEvent'
 import { mealPeriodInHour, SettingsService } from 'src/modules/settings'
 import { baseCommands } from '../../commands'
@@ -40,7 +41,7 @@ export class MealScenario implements IScenarioInstance {
 
     await this.mealEventEntity.createOrUpdate(payload)
 
-    const mealCountFromSettings = settings?.mealsCountPerDay || 'не установлено'
+    const mealCountFromSettings = settings?.mealsCountPerDay || MESSAGES.settings.unavailableSettled
     const countSum = events?.length + 1
 
     let muchText = ''
@@ -49,15 +50,12 @@ export class MealScenario implements IScenarioInstance {
     if (settings?.mealsCountPerDay && settings?.mealsCountPerDay <= countSum) {
       const isEqual = settings?.mealsCountPerDay === countSum
       const isMuch = settings?.mealsCountPerDay < countSum
-      muchText = `${
-        isEqual
-          ? 'Вы достигли назначенной цели, поздаврялем! Возвращайтесь завтра, чтобы продолжить контролировать количество приемов еды ;)'
-          : ''
-      }${
+      muchText = `${isEqual ? MESSAGES.meal.maxMeal : ''}${
         isMuch
-          ? `Вы съели на ${
-              countSum - settings?.mealsCountPerDay
-            } раз(а) больше, чем требуется. Рекоммендуем остановиться на сегодня, чтобы не нарушить график :(`
+          ? interpolate(MESSAGES.meal.overloadMeals, {
+              count: countSum - settings?.mealsCountPerDay,
+              word: declOfNum(countSum - settings?.mealsCountPerDay, ['раз', 'раза', 'раз']),
+            })
           : ''
       }`
     }
@@ -68,17 +66,25 @@ export class MealScenario implements IScenarioInstance {
 
     const periodInMinutes = parseInt(`${reminderPeriodInHour * 60}`)
 
-    const successText = `Прием пищи успешно сохранен ${countSum}/${mealCountFromSettings} ${
+    const successText = `${interpolate(MESSAGES.meal.successfullySaved, {
+      count: countSum,
+      maxCount: mealCountFromSettings,
+    })} ${
       muchText
         ? ''
         : `${
-            isNeedInfoAboutReminds ? `, следующий прием еды через ${periodInMinutes} минут, напомним за 30 минут` : ''
+            isNeedInfoAboutReminds
+              ? `, ${interpolate(MESSAGES.meal.nextMeal, {
+                  nextPeriod: periodInMinutes,
+                  periodWord: declOfNum(periodInMinutes, declWords.minutes),
+                  reminderMinute: 30,
+                  reminderWord: declOfNum(30, declWords.minutes),
+                })}`
+              : ''
           }`
     }`
 
-    const needAddMealText = isNeedToAddMealsCount
-      ? 'У вас не установлено количество приемов пищи в день, давайте установим?'
-      : ''
+    const needAddMealText = isNeedToAddMealsCount ? MESSAGES.settings.tryToSetCount : ''
 
     const text = `${successText}\n\n${needAddMealText}${muchText}`
 
@@ -107,7 +113,7 @@ export class MealScenario implements IScenarioInstance {
       return { isFinal: true }
     }
 
-    this.telegramService.sendMessage({ data: message, message: 'test', options: baseCommands })
+    this.telegramService.sendMessage({ data: message, message: MESSAGES.unavailableCommand, options: baseCommands })
 
     return { isFinal: true }
   }

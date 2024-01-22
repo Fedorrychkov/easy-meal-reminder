@@ -36,6 +36,6 @@ lerna-debug.log*
 
 package-lock.json
 
-.env
-service-account.json
+.env*
+service-account*.json
 .firebaserc

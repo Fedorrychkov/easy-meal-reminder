@@ -1,3 +1,5 @@
 export * from './id'
 export * from './time'
 export * from './string'
+export * from './declOfNum'
+export * from './interpolate'
