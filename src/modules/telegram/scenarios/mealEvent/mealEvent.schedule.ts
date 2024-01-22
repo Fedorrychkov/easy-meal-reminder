@@ -26,7 +26,7 @@ export class MealEventsSchedule {
     private readonly mealNotification: MealNotification,
   ) {}
 
-  @Cron(CronExpression.EVERY_10_SECONDS)
+  @Cron(CronExpression.EVERY_HOUR)
   async checkMealsByUsersToday() {
     const users = await this.userEntity.findAll()
 
