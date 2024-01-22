@@ -1,4 +1,4 @@
-import { MealBaseCommands } from '../scenarios/mealEvent/message.constants'
+import { MealBaseCommands } from '../scenarios/mealEvent/mealEvent.constants'
 import { SettingsBaseCommands } from '../scenarios/settings/settings.constants'
 
 export const baseCommands = {

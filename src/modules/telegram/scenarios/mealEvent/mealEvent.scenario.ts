@@ -10,7 +10,7 @@ import { settingsCommands } from '../../commands/settings'
 import { TelegramService } from '../../telegram.service'
 import { TelegramMessageHandlerType } from '../../telegram.types'
 import { IScenarioInstance } from '../scenarios.types'
-import { MealEventMessagesIncoming } from './message.constants'
+import { MealEventMessagesIncoming } from './mealEvent.constants'
 
 @Injectable()
 export class MealScenario implements IScenarioInstance {

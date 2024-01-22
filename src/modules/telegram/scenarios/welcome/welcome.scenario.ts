@@ -1,16 +1,17 @@
 import { Injectable } from '@nestjs/common'
 import * as TelegramBot from 'node-telegram-bot-api'
-import { UserDocument, UserEntity } from 'src/entities'
-import { baseCommands } from '../../commands'
-import { TelegramService } from '../../telegram.service'
-import { TelegramMessageHandlerType } from '../../telegram.types'
-import { MealEventMessagesIncoming } from '../mealEvent/message.constants'
-import { IScenarioInstance } from '../scenarios.types'
-import { WelcomeMessagesIncoming } from './message.constants'
+import { baseCommands, settingsCommands } from 'src/modules/telegram/commands'
+import { TelegramService } from 'src/modules/telegram/telegram.service'
+import { TelegramMessageHandlerType } from 'src/modules/telegram/telegram.types'
+import { MealEventMessagesIncoming } from '../mealEvent/mealEvent.constants'
 import { SettingsMessagesIncoming } from '../settings/settings.constants'
+import { IScenarioInstance } from '../scenarios.types'
+import { UserDocument, UserEntity } from 'src/entities'
+import { WelcomeMessagesIncoming } from './message.constants'
 import { SettingsService } from 'src/modules/settings'
-import { settingsCommands } from '../../commands/settings'
 import { MealEventService } from 'src/modules/mealEvent'
+import { MESSAGES } from 'src/messages'
+import { interpolate } from 'src/helpers'
 
 @Injectable()
 export class WelcomeScenario implements IScenarioInstance {
@@ -29,16 +30,16 @@ export class WelcomeScenario implements IScenarioInstance {
     const isPrivate = message?.chat.type
 
     if (!!user) {
-      const welcomeText = `С возвращением, @${user?.username}, вы уже поели?`
+      const welcomeText = interpolate(MESSAGES.welcome.welcomeBack, { username: user?.username })
 
       return welcomeText
     }
 
     const welcomeText = isPrivate
-      ? `Welcome on aboard, @${message?.from?.username}`
-      : 'Ого, меня включили не в личной переписке О_О. Я пока не поддерживаю такой вариант общения :( Пожалуйста, отпишите мне в личку ;)'
+      ? interpolate(MESSAGES.welcome.userGreeting, { username: message?.from?.username })
+      : MESSAGES.unavailableMode
 
-    const welcomeFinish = isPrivate ? 'Добро пожаловать, давайте начнем настраивать ваши приемы пищи?' : ''
+    const welcomeFinish = isPrivate ? MESSAGES.welcome.welcomeWithoutMealCount : ''
 
     const finalText = `
 ${welcomeText}
@@ -82,16 +83,14 @@ ${welcomeFinish}
       const isNeedToUseSettigns = !settings?.mealsCountPerDay
       const isNeedToShowInfoAboutEvents = !events?.length
 
-      const eventsText = isNeedToShowInfoAboutEvents ? 'За сегодня, вы еще не ели ни разу? Давайте это исправлять!' : ''
-      const countSettingsText = isNeedToUseSettigns
-        ? 'Для корректной работы, вам нужно настроить количество приемов еды, чтобы я мог уведомлять вас заблоговременно!\n\n'
-        : ''
+      const eventsText = isNeedToShowInfoAboutEvents ? MESSAGES.meal.mealTodayStartText : ''
+      const countSettingsText = isNeedToUseSettigns ? MESSAGES.settings.setCountMessageTextStart : ''
 
-      const remindsInfoText = `${countSettingsText}Обратите внимание, я начинаю уведомления от последнего зарегестрированного приема пищи`
+      const remindsInfoText = `${countSettingsText}${MESSAGES.settings.setCountMessageTextEnd}`
 
       this.telegramService.sendMessage({
         data: message,
-        message: `Приветствую! Я бот напоминающий о приемах пищи!\n\n${remindsInfoText}\n\n${eventsText}`,
+        message: `${MESSAGES.welcome.greeting}\n\n${remindsInfoText}\n\n${eventsText}`,
         options: isNeedToUseSettigns ? settingsCommands : baseCommands,
       })
 

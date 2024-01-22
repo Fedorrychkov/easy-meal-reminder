@@ -1,6 +1,8 @@
+import { COMMAND_MESSAGES } from 'src/messages'
+
 export const MealBaseCommands = {
   mealStart: {
-    text: 'Я уже поел',
+    text: COMMAND_MESSAGES.meal.mealDone,
   },
 }
 

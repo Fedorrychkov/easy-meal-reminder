@@ -1,7 +1,8 @@
+import { declWords, MESSAGES } from 'src/messages'
 import { Injectable } from '@nestjs/common'
 import * as TelegramBot from 'node-telegram-bot-api'
 import { SettingsEntity, UserEntity } from 'src/entities'
-import { getNumber } from 'src/helpers'
+import { declOfNum, getNumber, interpolate } from 'src/helpers'
 import { MealEventService } from 'src/modules/mealEvent'
 import { mealPeriodInHour, SettingsService } from 'src/modules/settings'
 import { baseCommands } from '../../commands'
@@ -51,25 +52,35 @@ export class SettingsScenario implements IScenarioInstance {
         await this.settingsService.createOrUpdate(payload)
       }
 
-      const mealRegisteredText = `За сегодня было зарегистрировано ${events?.length} приемов пищи`
+      const mealRegisteredText = interpolate(MESSAGES.meal.mealTodayRegisteredTimes, { count: events?.length || 0 })
       const reminderPeriodInHour = mealPeriodInHour / count
 
       const isNeedInfoAboutReminds = count > 1 && isValidNumber
       const periodInMinutes = parseInt(`${reminderPeriodInHour * 60}`)
       const reminderPeriodText = isNeedInfoAboutReminds
-        ? `Судя по выбранному количеству приемов в день, вам нужно кушать каждые ~${periodInMinutes} минут`
+        ? interpolate(MESSAGES.meal.mealReminderMinutesRecommend, {
+            reminderPeriod: periodInMinutes,
+            reminderMinute: declOfNum(periodInMinutes, declWords.minutes),
+          })
         : ''
 
       const reminderNotificationText =
         isNeedInfoAboutReminds && settings?.isNotificationEnabled
-          ? `Вы будете получать уведомления, примерно, за 30 минут каждые ~${periodInMinutes} минут`
+          ? interpolate(MESSAGES.meal.mealReminderInfoText, {
+              reminderPeriond: 30,
+              reminderMinute: declOfNum(30, declWords.minutes),
+              reminderUserPeriod: periodInMinutes,
+              reminderMinutePeriod: declOfNum(periodInMinutes, declWords.minutes),
+            })
           : ''
 
       this.telegramService.sendMessage({
         data: message,
         message: isValidNumber
-          ? `Количество приемов в ${count}/день успешно установлено\n\n${mealRegisteredText}\n\n${reminderPeriodText}\n\n${reminderNotificationText}`
-          : 'Попробуйте еще раз',
+          ? `${interpolate(MESSAGES.settings.successfullySettled, {
+              count,
+            })}\n\n${mealRegisteredText}\n\n${reminderPeriodText}\n\n${reminderNotificationText}`
+          : MESSAGES.tryAgain,
         options: isValidNumber ? baseCommands : settingsCommands,
       })
 
@@ -79,7 +90,7 @@ export class SettingsScenario implements IScenarioInstance {
     if (SettingsMessagesIncoming.main === message?.text) {
       this.telegramService.sendMessage({
         data: message,
-        message: 'Выберите необходимую команду',
+        message: MESSAGES.chooseCommand,
         options: baseCommands,
       })
 
@@ -99,7 +110,9 @@ export class SettingsScenario implements IScenarioInstance {
 
       this.telegramService.sendMessage({
         data: message,
-        message: `Уведомления отключены, включить можете нажав на кнопку или написав "${SettingsMessagesIncoming.mealRemindsStart}"`,
+        message: interpolate(MESSAGES.settings.notificationsSuccessfullyDisabled, {
+          command: SettingsMessagesIncoming.mealRemindsStart,
+        }),
         options: baseCommands,
       })
 
@@ -119,7 +132,9 @@ export class SettingsScenario implements IScenarioInstance {
 
       this.telegramService.sendMessage({
         data: message,
-        message: `Уведомления включены, отключить можете нажав на кнопку или написав "${SettingsMessagesIncoming.mealRemindsDrop}"`,
+        message: interpolate(MESSAGES.settings.notificationsSuccessfullyEnabled, {
+          command: SettingsMessagesIncoming.mealRemindsDrop,
+        }),
         options: baseCommands,
       })
 
@@ -128,8 +143,7 @@ export class SettingsScenario implements IScenarioInstance {
 
     this.telegramService.sendMessage({
       data: message,
-      message:
-        'В настройках вы можете указать количество приемов пищи, для управления уведомления перейдите на главную',
+      message: MESSAGES.settings.info,
       options: settingsCommands,
     })
 

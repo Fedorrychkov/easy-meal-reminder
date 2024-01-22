@@ -2,7 +2,8 @@ import { Injectable, Logger } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { Dayjs } from 'dayjs'
 import { MealEventDocument, SettingsDocument, UserDocument, UserEntity } from 'src/entities'
-import { time } from 'src/helpers'
+import { interpolate, time, declOfNum } from 'src/helpers'
+import { MESSAGES, declWords } from 'src/messages'
 import { MealEventService } from 'src/modules/mealEvent'
 import { mealPeriodInHour, SettingsService } from 'src/modules/settings'
 import { settingsCommands } from '../../commands/settings'
@@ -16,6 +17,7 @@ export class MealEventsSchedule {
   private notificationMealSended = new Map<string, boolean>()
   private notificationMealStartSended = new Map<string, number>()
   private notificationMealCountPerDatSended = new Map<string, number>()
+  private notificationContinueSettingsInstallement = new Map<string, number>()
 
   constructor(
     private readonly mealEventService: MealEventService,
@@ -24,7 +26,7 @@ export class MealEventsSchedule {
     private readonly mealNotification: MealNotification,
   ) {}
 
-  @Cron(CronExpression.EVERY_HOUR)
+  @Cron(CronExpression.EVERY_10_SECONDS)
   async checkMealsByUsersToday() {
     const users = await this.userEntity.findAll()
 
@@ -35,16 +37,33 @@ export class MealEventsSchedule {
           this.settingsService.getByUserId(user.id),
         ])
 
+        const isToday = time
+          .unix((user.createdAt as any)?._seconds)
+          .tz('Europe/Moscow')
+          .isToday()
+
         const { isNeedToPushNotification, currentDate, currentDateInstance } = getTimeInfoForNotifications()
 
+        if (!settings && !isToday) {
+          await this.sendSettingsInstallement({
+            user,
+            settings,
+            currentDate,
+            currentDateInstance,
+          })
+
+          return
+        }
+
         // Если время еще не 10 утра (по мск по сути) или нотификации выключены, то уведомления не посылаем.
-        if (!isNeedToPushNotification || !settings?.isNotificationEnabled) {
+        if (!isNeedToPushNotification || !settings?.isNotificationEnabled || isToday) {
           this.logger.log(
             `[checkMealsByUsersToday]: Пользователь ${user.id} с ником ${user.username} пока не может получать уведомления`,
             {
               isNeedToPushNotification,
               isNotificationEnabled: settings?.isNotificationEnabled,
               currentDatetime: currentDateInstance.format('DD/MM/YYYY HH:mm:ss'),
+              isToday,
             },
           )
 
@@ -173,13 +192,52 @@ export class MealEventsSchedule {
         if (isNeedToSend) {
           await this.mealNotification.mealNotificationSend(
             user.chatId,
-            'Не забудьте покушать! Следующий прием пищи ожидается в течении 30 минут ;)',
+            interpolate(MESSAGES.meal.mealReminder, {
+              reminderMinute: 30,
+              reminderWord: declOfNum(30, declWords.minutes),
+            }),
           )
 
           this.notificationMealSended.set(key, true)
         }
       }),
     )
+  }
+
+  private async sendSettingsInstallement({
+    user,
+    settings,
+    currentDate,
+    currentDateInstance,
+  }: {
+    user: UserDocument
+    settings: SettingsDocument
+    currentDate: string
+    currentDateInstance: Dayjs
+  }) {
+    if (settings) {
+      return false
+    }
+
+    const key = `${user.id}-${currentDate}`
+    const lastTodayNotification = this.notificationContinueSettingsInstallement.get(key)
+
+    if (lastTodayNotification) {
+      this.logger.log(
+        `[sendSettingsInstallement]: Пользователь ${user.id} с ником ${user.username} уже получал уведомления о продолжении установки настроек`,
+      )
+
+      return false
+    }
+
+    await this.mealNotification.mealNotificationSend(
+      user.chatId,
+      MESSAGES.settings.settingsInstallementContinueNotification,
+    )
+
+    this.notificationContinueSettingsInstallement.set(key, currentDateInstance.valueOf())
+
+    return true
   }
 
   private async sendMealStartNotification({
@@ -219,12 +277,15 @@ export class MealEventsSchedule {
     const mealsCountPerDay = settings?.mealsCountPerDay
 
     const mealCountInfo = !!mealsCountPerDay
-      ? `\n\nСегодня вас ждет ${mealsCountPerDay} приемов пищи, удачи, с соблюдеием графика!`
+      ? `\n\n${interpolate(MESSAGES.meal.mealReminderAwaitToStart, {
+          count: mealsCountPerDay,
+          countWord: declOfNum(mealsCountPerDay, ['прием', 'приема', 'приемов']),
+        })}`
       : ''
 
     await this.mealNotification.mealNotificationSend(
       user.chatId,
-      `Приветствую! Вы сегодня еще не кушали, постарайтесь сделать это в ближайшее время!${mealCountInfo}`,
+      `${MESSAGES.meal.mealReminderAwaitToStartGreeting}${mealCountInfo}`,
     )
 
     this.notificationMealStartSended.set(key, currentDateInstance.valueOf())
@@ -243,20 +304,7 @@ export class MealEventsSchedule {
     currentDate: string
     currentDateInstance: Dayjs
   }) {
-    const isToday = time
-      .unix((user.createdAt as any)?._seconds)
-      .tz('Europe/Moscow')
-      .isToday()
-
-    this.logger.log(
-      `[sendMealsCountPerDayNotification]: Пользователь ${user.id} с ником ${user.username} пока не может получать уведомления`,
-      {
-        isToday,
-        mealsCountPerDay: settings?.mealsCountPerDay,
-      },
-    )
-
-    if ((settings?.mealsCountPerDay && settings?.mealsCountPerDay > 0) || isToday) {
+    if (settings?.mealsCountPerDay && settings?.mealsCountPerDay > 0) {
       return false
     }
 
@@ -272,12 +320,11 @@ export class MealEventsSchedule {
       return false
     }
 
-    const countSettingsText =
-      'Для корректной работы, вам нужно настроить количество приемов еды, чтобы я мог уведомлять вас заблоговременно!\n\n'
-
-    const remindsInfoText = `${countSettingsText}Обратите внимание, я начинаю уведомления от последнего зарегестрированного приема пищи`
-
-    await this.mealNotification.mealNotificationSend(user.chatId, `${remindsInfoText}`, settingsCommands)
+    await this.mealNotification.mealNotificationSend(
+      user.chatId,
+      MESSAGES.settings.setCountMessageTextFull,
+      settingsCommands,
+    )
 
     this.notificationMealCountPerDatSended.set(key, currentDateInstance.valueOf())
 

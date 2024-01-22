@@ -1,9 +1,17 @@
+import { declOfNum, interpolate } from 'src/helpers'
+import { COMMAND_MESSAGES } from 'src/messages'
 import { CommandType } from '../scenarios.types'
 
 export const availableMealCounts = [1, 2, 3, 4, 5, 6, 7, 8]
 
 export const SettingMealsMessageIncomingCount: Record<string, string> = availableMealCounts
-  ?.map((count) => ({ count, text: `У меня будет ${count} приемов пищи в день` }))
+  ?.map((count) => ({
+    count,
+    text: interpolate(COMMAND_MESSAGES.settings.mealCountSetter, {
+      count,
+      countWord: declOfNum(count, ['прием', 'приема', 'приемов']),
+    }),
+  }))
   .reduce((all, item) => {
     return {
       ...all,
@@ -13,9 +21,9 @@ export const SettingMealsMessageIncomingCount: Record<string, string> = availabl
 
 export const SettingsMessagesIncoming = {
   settings: '/settings',
-  main: 'На главную',
-  mealRemindsDrop: 'Остановить напоминания',
-  mealRemindsStart: 'Запустить напоминания',
+  main: COMMAND_MESSAGES.default.home,
+  mealRemindsDrop: COMMAND_MESSAGES.settings.mealRemindsDrop,
+  mealRemindsStart: COMMAND_MESSAGES.settings.mealRemindsStart,
   ...SettingMealsMessageIncomingCount,
 }
 
