@@ -24,6 +24,8 @@ export const SettingsMessagesIncoming = {
   main: COMMAND_MESSAGES.default.home,
   mealRemindsDrop: COMMAND_MESSAGES.settings.mealRemindsDrop,
   mealRemindsStart: COMMAND_MESSAGES.settings.mealRemindsStart,
+  mealPeriodTime: COMMAND_MESSAGES.settings.mealPeriodTime,
+  mealCountsSize: COMMAND_MESSAGES.settings.mealCountsSize,
   ...SettingMealsMessageIncomingCount,
 }
 
@@ -49,6 +51,12 @@ export const SettingsBaseCommands: CommandType = {
   },
   mealRemindsStart: {
     text: SettingsMessagesIncoming.mealRemindsStart,
+  },
+  mealPeriodTime: {
+    text: SettingsMessagesIncoming.mealPeriodTime,
+  },
+  mealCountsSize: {
+    text: SettingsMessagesIncoming.mealCountsSize,
   },
   ...settingsMealCountCommands,
 }

@@ -5,8 +5,8 @@ import { MealEventDocument, SettingsDocument, UserDocument, UserEntity } from 's
 import { interpolate, time, declOfNum } from 'src/helpers'
 import { MESSAGES, declWords } from 'src/messages'
 import { MealEventService } from 'src/modules/mealEvent'
-import { mealPeriodInHour, SettingsService } from 'src/modules/settings'
-import { settingsCommands } from '../../commands/settings'
+import { SettingsHelper, SettingsService } from 'src/modules/settings'
+import { settingsMealsCommands } from '../../commands/settings'
 import { MealNotification } from './mealEvent.notification'
 import { getTimeInfoForNotifications } from './utils'
 
@@ -24,6 +24,7 @@ export class MealEventsSchedule {
     private readonly settingsService: SettingsService,
     private readonly userEntity: UserEntity,
     private readonly mealNotification: MealNotification,
+    private readonly settingsHelper: SettingsHelper,
   ) {}
 
   @Cron(CronExpression.EVERY_HOUR)
@@ -42,7 +43,13 @@ export class MealEventsSchedule {
           .tz('Europe/Moscow')
           .isToday()
 
-        const { isNeedToPushNotification, currentDate, currentDateInstance } = getTimeInfoForNotifications()
+        const { difference, from, to } = this.settingsHelper.tryToGetDifferenceAndParsedPeriod(settings.mealPeriodTimes)
+
+        const { isNeedToPushNotification, currentDate, currentDateInstance } = getTimeInfoForNotifications({
+          difference,
+          from,
+          to,
+        })
 
         if (!settings && !isToday) {
           await this.sendSettingsInstallement({
@@ -126,7 +133,6 @@ export class MealEventsSchedule {
             `[getMealEvents]: Пользователь ${user.id} с ником ${user.username} не установил количество приемов пищи`,
           )
 
-          // TODO: Добавить уведомления 1 раз в день об установке количества приемов пищи (начать уведомлять через день после регистрации)
           return
         }
 
@@ -136,7 +142,9 @@ export class MealEventsSchedule {
           return
         }
 
-        const { isNeedToPushNotification } = getTimeInfoForNotifications()
+        const { difference, from, to } = this.settingsHelper.tryToGetDifferenceAndParsedPeriod(settings.mealPeriodTimes)
+
+        const { isNeedToPushNotification } = getTimeInfoForNotifications({ difference, from, to })
 
         if (!isNeedToPushNotification) {
           this.logger.log(
@@ -151,7 +159,7 @@ export class MealEventsSchedule {
 
         const reversedEvents = [...events?.reverse()]
 
-        const reminderPeriodInMinutes = (mealPeriodInHour / settings?.mealsCountPerDay) * 60
+        const reminderPeriodInMinutes = difference / settings?.mealsCountPerDay
         const [lastEvent] = reversedEvents
 
         const key = `${user.id}-${lastEvent.id}`
@@ -323,7 +331,7 @@ export class MealEventsSchedule {
     await this.mealNotification.mealNotificationSend(
       user.chatId,
       MESSAGES.settings.setCountMessageTextFull,
-      settingsCommands,
+      settingsMealsCommands,
     )
 
     this.notificationMealCountPerDatSended.set(key, currentDateInstance.valueOf())

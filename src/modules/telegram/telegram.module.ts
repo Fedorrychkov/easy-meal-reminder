@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common'
 import { UserEntity } from 'src/entities'
 import { MealEventModule } from '../mealEvent'
 import { SettingsModule } from '../settings'
-import { WelcomeScenario, MealScenario, MealEventsSchedule, MealNotification } from './scenarios'
+import { WelcomeScenario, MealScenario, MealEventsSchedule, MealNotification, ScenariosStorage } from './scenarios'
 import { SettingsScenario } from './scenarios/settings'
 import { TelegramInstance } from './telegram.instance'
 import { TelegramListener } from './telegram.listener'
@@ -28,6 +28,9 @@ import { TelegramService } from './telegram.service'
 
     // Schedules
     MealEventsSchedule,
+
+    // Local Custom Storage
+    ScenariosStorage,
   ],
   exports: [],
 })

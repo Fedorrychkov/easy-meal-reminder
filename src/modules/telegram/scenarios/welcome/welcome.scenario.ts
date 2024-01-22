@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import * as TelegramBot from 'node-telegram-bot-api'
-import { baseCommands, settingsCommands } from 'src/modules/telegram/commands'
+import { baseCommands, settingsMealsCommands } from 'src/modules/telegram/commands'
 import { TelegramService } from 'src/modules/telegram/telegram.service'
 import { TelegramMessageHandlerType } from 'src/modules/telegram/telegram.types'
 import { MealEventMessagesIncoming } from '../mealEvent/mealEvent.constants'
@@ -91,7 +91,7 @@ ${welcomeFinish}
       this.telegramService.sendMessage({
         data: message,
         message: `${MESSAGES.welcome.greeting}\n\n${remindsInfoText}\n\n${eventsText}`,
-        options: isNeedToUseSettigns ? settingsCommands : baseCommands,
+        options: isNeedToUseSettigns ? settingsMealsCommands : baseCommands,
       })
 
       return { isFinal: true }

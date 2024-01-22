@@ -3,10 +3,6 @@ import { SettingsBaseCommands } from '../scenarios/settings/settings.constants'
 
 export const baseCommands = {
   reply_markup: {
-    keyboard: [
-      [MealBaseCommands.mealStart],
-      [SettingsBaseCommands.mealRemindsDrop, SettingsBaseCommands.mealRemindsStart],
-      [SettingsBaseCommands.settings],
-    ],
+    keyboard: [[MealBaseCommands.mealStart], [MealBaseCommands.mealLater], [SettingsBaseCommands.settings]],
   },
 }

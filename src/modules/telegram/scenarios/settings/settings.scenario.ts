@@ -1,20 +1,23 @@
 import { declWords, MESSAGES } from 'src/messages'
-import { Injectable } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import * as TelegramBot from 'node-telegram-bot-api'
 import { SettingsEntity, UserEntity } from 'src/entities'
 import { declOfNum, getNumber, interpolate } from 'src/helpers'
 import { MealEventService } from 'src/modules/mealEvent'
-import { mealPeriodInHour, SettingsService } from 'src/modules/settings'
+import { SettingsHelper, SettingsService } from 'src/modules/settings'
 import { baseCommands } from '../../commands'
-import { settingsCommands } from '../../commands/settings'
+import { mainSettingsCommands, settingsMealsCommands } from '../../commands/settings'
 import { TelegramService } from '../../telegram.service'
 import { TelegramMessageHandlerType } from '../../telegram.types'
-import { IScenarioInstance } from '../scenarios.types'
+import { IScenarioInstance, StorageEntity } from '../scenarios.types'
 import { availableMealCounts, SettingMealsMessageIncomingCount, SettingsMessagesIncoming } from './settings.constants'
+import { ScenariosStorage } from '../scenarios.storage'
 
 @Injectable()
 export class SettingsScenario implements IScenarioInstance {
-  messageHandlers: TelegramMessageHandlerType[]
+  private logger = new Logger(SettingsScenario.name)
+  public messageHandlers: TelegramMessageHandlerType[]
+  public entity = StorageEntity.settings
 
   constructor(
     private readonly telegramService: TelegramService,
@@ -22,12 +25,58 @@ export class SettingsScenario implements IScenarioInstance {
     private readonly settingsService: SettingsService,
     private readonly mealEventService: MealEventService,
     private readonly settingsEntity: SettingsEntity,
+    private readonly settingsHelper: SettingsHelper,
+    private readonly scenariosStorage: ScenariosStorage,
   ) {
     this.messageHandlers = [this.settings.bind(this)]
   }
 
   private async settings(message: TelegramBot.Message) {
     const user = await this.userEntity.getUser(`${message?.from?.id}`)
+
+    const { isPeriodTimeScenario } = this.scenariosStorage.getStore(StorageEntity.settings)
+
+    if (isPeriodTimeScenario) {
+      try {
+        const { from, to } = this.settingsHelper.tryToParsePeriodUserText(message?.text)
+        const difference = this.settingsHelper.tryToGetPeriodDifferenceInMinutes({ from, to })
+
+        this.logger.log(
+          `[isPeriodTimeScenario]: Пользователю ${user.id} с ником ${user.username} установил свой промежуток времени работы`,
+          { from, to, difference },
+        )
+
+        const settings = await this.settingsService.getByUserId(user.id)
+
+        const periodsText = `${from.h}:${from.m}-${to.h}:${to.m}`
+
+        const payload = this.settingsEntity.getValidProperties({
+          ...settings,
+          mealPeriodTimes: periodsText,
+          userId: user.id,
+        })
+
+        await this.settingsService.createOrUpdate(payload)
+
+        this.telegramService.sendMessage({
+          data: message,
+          message: MESSAGES.settings.customTimePeriodSuccessfullySaved,
+          options: mainSettingsCommands,
+        })
+
+        this.scenariosStorage.clearStore(StorageEntity.settings)
+
+        return { isFinal: true }
+      } catch (error) {
+        this.telegramService.sendMessage({
+          data: message,
+          message: error?.message,
+          options: mainSettingsCommands,
+        })
+      }
+
+      return { isFinal: true }
+    }
 
     if (!Object.values(SettingsMessagesIncoming).includes(message?.text)) {
       return
@@ -53,10 +102,10 @@ export class SettingsScenario implements IScenarioInstance {
       }
 
       const mealRegisteredText = interpolate(MESSAGES.meal.mealTodayRegisteredTimes, { count: events?.length || 0 })
-      const reminderPeriodInHour = mealPeriodInHour / count
+      const { difference } = this.settingsHelper.tryToGetDifferenceAndParsedPeriod(settings.mealPeriodTimes)
+      const periodInMinutes = difference / count
 
       const isNeedInfoAboutReminds = count > 1 && isValidNumber
-      const periodInMinutes = parseInt(`${reminderPeriodInHour * 60}`)
       const reminderPeriodText = isNeedInfoAboutReminds
         ? interpolate(MESSAGES.meal.mealReminderMinutesRecommend, {
             reminderPeriod: periodInMinutes,
@@ -81,7 +130,7 @@ export class SettingsScenario implements IScenarioInstance {
               count,
             })}\n\n${mealRegisteredText}\n\n${reminderPeriodText}\n\n${reminderNotificationText}`
           : MESSAGES.tryAgain,
-        options: isValidNumber ? baseCommands : settingsCommands,
+        options: isValidNumber ? mainSettingsCommands : settingsMealsCommands,
       })
 
       return { isFinal: true }
@@ -141,10 +190,36 @@ export class SettingsScenario implements IScenarioInstance {
       return { isFinal: true }
     }
 
+    if (SettingsMessagesIncoming.mealCountsSize === message?.text) {
+      this.telegramService.sendMessage({
+        data: message,
+        message: MESSAGES.settings.setMealCountsSizeWelcome,
+        options: settingsMealsCommands,
+      })
+
+      return { isFinal: true }
+    }
+
+    if (SettingsMessagesIncoming.mealPeriodTime === message?.text) {
+      const settings = await this.settingsService.getByUserId(user.id)
+
+      this.scenariosStorage.updateStore(StorageEntity.settings, { isPeriodTimeScenario: true })
+
+      this.telegramService.sendMessage({
+        data: message,
+        message: interpolate(MESSAGES.settings.setCustomTimePeriodInfo, {
+          currentTimePeriod: `${settings?.mealPeriodTimes || '10:00-22:00'} (MSC)`,
+        }),
+        options: mainSettingsCommands,
+      })
+
+      return { isFinal: true }
+    }
+
     this.telegramService.sendMessage({
       data: message,
       message: MESSAGES.settings.info,
-      options: settingsCommands,
+      options: mainSettingsCommands,
     })
 
     return { isFinal: true }

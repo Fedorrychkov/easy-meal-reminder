@@ -1,2 +1,2 @@
 // Период питания в 12 часов. По логике, планирую считать это время от регистрации первого приема пищи за день
-export const mealPeriodInHour = 12
+export const mealPeriodInMinutes = 12 * 60
