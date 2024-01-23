@@ -3,7 +3,7 @@ import { StorageEntity } from './scenarios.types'
 
 @Injectable()
 export class ScenariosStorage {
-  private store: Record<StorageEntity, Record<string, unknown> | null | undefined>
+  private store: Record<StorageEntity, Record<string, unknown> | null | undefined> | undefined
   private lastUsedEntity: StorageEntity | undefined
 
   constructor() {
@@ -44,8 +44,8 @@ export class ScenariosStorage {
 
   private _clearEntities(entity: StorageEntity) {
     Object.values(StorageEntity).forEach((key: StorageEntity) => {
-      if (key !== entity) {
-        this.store[key as StorageEntity] = null
+      if (key !== entity && this.store?.[key]) {
+        this.store[key] = null
       }
     })
   }
