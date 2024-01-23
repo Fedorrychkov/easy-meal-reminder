@@ -1,11 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { Dayjs } from 'dayjs'
-import { MealEventDocument, SettingsDocument, UserDocument, UserEntity } from 'src/entities'
+import { MealEventDocument, MealEventStatus, SettingsDocument, UserDocument, UserEntity } from 'src/entities'
 import { interpolate, time, declOfNum } from 'src/helpers'
 import { MESSAGES, declWords } from 'src/messages'
 import { MealEventService } from 'src/modules/mealEvent'
-import { SettingsHelper, SettingsService } from 'src/modules/settings'
+import {
+  SettingsHelper,
+  SettingsService,
+  startMealPeriodInMinutes,
+  nextMealReminderStandartPeriodInMinute,
+  continueSkippedMealPeriodInMinute,
+} from 'src/modules/settings'
 import { settingsMealsCommands } from '../../commands/settings'
 import { MealNotification } from './mealEvent.notification'
 import { getTimeInfoForNotifications } from './utils'
@@ -15,7 +21,7 @@ export class MealEventsSchedule {
   private readonly logger: Logger = new Logger(MealEventsSchedule.name)
 
   private notificationMealSended = new Map<string, boolean>()
-  private notificationMealStartSended = new Map<string, number>()
+  private notificationMealStartSended = new Map<string, number[]>()
   private notificationMealCountPerDatSended = new Map<string, number>()
   private notificationContinueSettingsInstallement = new Map<string, number>()
 
@@ -27,8 +33,8 @@ export class MealEventsSchedule {
     private readonly settingsHelper: SettingsHelper,
   ) {}
 
-  @Cron(CronExpression.EVERY_HOUR)
-  async checkMealsByUsersToday() {
+  @Cron(CronExpression.EVERY_30_MINUTES)
+  async checkMealsAndSettingsByUsersToday() {
     const users = await this.userEntity.findAll()
 
     await Promise.allSettled(
@@ -97,7 +103,10 @@ export class MealEventsSchedule {
   // EVERY 2 MINUTES
   @Cron('0 */2 * * * *')
   async getMealEvents() {
-    const events = await this.mealEventService.getTodayEvents()
+    const events = await this.mealEventService.getTodayEvents(undefined, [
+      MealEventStatus.CONFIRMED,
+      MealEventStatus.SKIPPED,
+    ])
 
     const eventsByUsers = new Map<string, MealEventDocument[] | undefined>()
 
@@ -162,7 +171,7 @@ export class MealEventsSchedule {
         const reminderPeriodInMinutes = difference / settings?.mealsCountPerDay
         const [lastEvent] = reversedEvents
 
-        const key = `${user.id}-${lastEvent.id}`
+        const key = `${user.id}-${lastEvent.id}-${lastEvent.status}`
         const isSended = this.notificationMealSended.get(key) || false
 
         if (isSended) {
@@ -176,15 +185,17 @@ export class MealEventsSchedule {
           return
         }
 
-        const diff = Math.round(
-          time
-            .unix((lastEvent.createdAt as any)?._seconds)
-            .tz('Europe/Moscow')
-            .diff(time().tz('Europe/Moscow')) / 1000,
-        )
+        const isLastSkipped = lastEvent && lastEvent?.status === MealEventStatus.SKIPPED
+
+        const lastTime = (lastEvent?.updatedAt as any)?._seconds || (lastEvent?.createdAt as any)?._seconds
+        const diff = Math.round(time.unix(lastTime).tz('Europe/Moscow').diff(time().tz('Europe/Moscow')) / 1000)
         const minutes = Math.floor(diff / 60)
 
-        const isNeedToSend = minutes - -reminderPeriodInMinutes < 30
+        // слева - если осталось меньше чем nextMealReminderStandartPeriodInMinute, то отправляем уведомление о следующем приеме
+        // справа - если осталось прошло больше чем continueSkippedMealPeriodInMinute, то отправляем уведомление об отложенном приеме
+        const isNeedToSend = !isLastSkipped
+          ? minutes - -reminderPeriodInMinutes < nextMealReminderStandartPeriodInMinute
+          : minutes - -continueSkippedMealPeriodInMinute < 0
 
         if (!isNeedToSend) {
           this.logger.log(
@@ -192,19 +203,22 @@ export class MealEventsSchedule {
             {
               minutes,
               reminderPeriodInMinutes,
+              isLastSkipped,
               diff: minutes - -reminderPeriodInMinutes,
+              skippedDiff: minutes - -continueSkippedMealPeriodInMinute < 0,
             },
           )
         }
 
         if (isNeedToSend) {
-          await this.mealNotification.mealNotificationSend(
-            user.chatId,
-            interpolate(MESSAGES.meal.mealReminder, {
-              reminderMinute: 30,
-              reminderWord: declOfNum(30, declWords.minutes),
-            }),
-          )
+          const text = !isLastSkipped
+            ? interpolate(MESSAGES.meal.mealReminder, {
+                reminderMinute: nextMealReminderStandartPeriodInMinute,
+                reminderWord: declOfNum(nextMealReminderStandartPeriodInMinute, declWords.minutes),
+              })
+            : MESSAGES.meal.mealSkippedReminder
+
+          await this.mealNotification.mealNotificationSend(user.chatId, text)
 
           this.notificationMealSended.set(key, true)
         }
@@ -272,9 +286,9 @@ export class MealEventsSchedule {
       return false
     }
 
-    const lastTodayNotification = this.notificationMealStartSended.get(key)
+    const lastTodayNotifications = this.notificationMealStartSended.get(key)
 
-    if (lastTodayNotification) {
+    if (lastTodayNotifications?.length >= 3) {
       this.logger.log(
         `[sendMealStartNotification]: Пользователь ${user.id} с ником ${user.username} уже получал уведомления о начале еды`,
       )
@@ -291,12 +305,29 @@ export class MealEventsSchedule {
         })}`
       : ''
 
+    const [lastTodayNotification] = [...(lastTodayNotifications || [])]?.reverse()
+
+    const currentTime = currentDateInstance
+    const lastNotificationTime = time(lastTodayNotification || currentDateInstance?.valueOf())
+    const from = { h: Number(lastNotificationTime.format('HH')), m: Number(lastNotificationTime.format('mm')) }
+    const to = { h: Number(currentTime.format('HH')), m: Number(currentTime.format('mm')) }
+
+    const difference = this.settingsHelper.tryToGetPeriodDifferenceInMinutes({ from, to })
+
+    if (lastTodayNotification && difference < startMealPeriodInMinutes) {
+      this.logger.log(
+        `[sendMealStartNotification]: Пользователь ${user.id} с ником ${user.username} с последнего уведомления прошло ${difference} минут`,
+      )
+
+      return false
+    }
+
     await this.mealNotification.mealNotificationSend(
       user.chatId,
       `${MESSAGES.meal.mealReminderAwaitToStartGreeting}${mealCountInfo}`,
     )
 
-    this.notificationMealStartSended.set(key, currentDateInstance.valueOf())
+    this.notificationMealStartSended.set(key, [...(lastTodayNotifications || []), currentDateInstance.valueOf()])
 
     return true
   }

@@ -9,4 +9,6 @@ export type CommandType = Record<string, { text: string }>
 
 export enum StorageEntity {
   settings = 'settings',
+  welcome = 'welcome',
+  meal = 'meal',
 }

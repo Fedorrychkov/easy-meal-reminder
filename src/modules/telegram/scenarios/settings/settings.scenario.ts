@@ -4,7 +4,7 @@ import * as TelegramBot from 'node-telegram-bot-api'
 import { SettingsEntity, UserEntity } from 'src/entities'
 import { declOfNum, getNumber, interpolate } from 'src/helpers'
 import { MealEventService } from 'src/modules/mealEvent'
-import { SettingsHelper, SettingsService } from 'src/modules/settings'
+import { nextMealReminderStandartPeriodInMinute, SettingsHelper, SettingsService } from 'src/modules/settings'
 import { baseCommands } from '../../commands'
 import { mainSettingsCommands, settingsMealsCommands } from '../../commands/settings'
 import { TelegramService } from '../../telegram.service'
@@ -116,8 +116,8 @@ export class SettingsScenario implements IScenarioInstance {
       const reminderNotificationText =
         isNeedInfoAboutReminds && settings?.isNotificationEnabled
           ? interpolate(MESSAGES.meal.mealReminderInfoText, {
-              reminderPeriond: 30,
-              reminderMinute: declOfNum(30, declWords.minutes),
+              reminderPeriond: nextMealReminderStandartPeriodInMinute,
+              reminderMinute: declOfNum(nextMealReminderStandartPeriodInMinute, declWords.minutes),
               reminderUserPeriod: periodInMinutes,
               reminderMinutePeriod: declOfNum(periodInMinutes, declWords.minutes),
             })

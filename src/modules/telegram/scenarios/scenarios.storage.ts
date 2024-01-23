@@ -37,6 +37,8 @@ export class ScenariosStorage {
   }
 
   public checkIsLastEntity(entity: StorageEntity) {
+    if (!entity) return undefined
+
     return this.lastUsedEntity === entity
   }
 

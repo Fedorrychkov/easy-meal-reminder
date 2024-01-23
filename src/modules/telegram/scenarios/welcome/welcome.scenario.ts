@@ -5,7 +5,7 @@ import { TelegramService } from 'src/modules/telegram/telegram.service'
 import { TelegramMessageHandlerType } from 'src/modules/telegram/telegram.types'
 import { MealEventMessagesIncoming } from '../mealEvent/mealEvent.constants'
 import { SettingsMessagesIncoming } from '../settings/settings.constants'
-import { IScenarioInstance } from '../scenarios.types'
+import { IScenarioInstance, StorageEntity } from '../scenarios.types'
 import { UserDocument, UserEntity } from 'src/entities'
 import { WelcomeMessagesIncoming } from './message.constants'
 import { SettingsService } from 'src/modules/settings'
@@ -16,6 +16,7 @@ import { interpolate } from 'src/helpers'
 @Injectable()
 export class WelcomeScenario implements IScenarioInstance {
   messageHandlers: TelegramMessageHandlerType[]
+  public entity = StorageEntity.welcome
 
   constructor(
     private readonly telegramService: TelegramService,
