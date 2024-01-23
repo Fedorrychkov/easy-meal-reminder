@@ -86,7 +86,7 @@ export class SettingsScenario implements IScenarioInstance {
       const count = parseFloat(getNumber(message?.text))
       const [settings, events] = await Promise.all([
         this.settingsService.getByUserId(user.id),
-        await this.mealEventService.getTodayEvents(),
+        await this.mealEventService.getTodayEvents(user.id),
       ])
 
       const isValidNumber = !Number.isNaN(count) ? availableMealCounts?.findIndex((item) => count === item) > -1 : false

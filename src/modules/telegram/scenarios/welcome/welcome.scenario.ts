@@ -78,7 +78,7 @@ ${welcomeFinish}
     if (message?.text?.indexOf(WelcomeMessagesIncoming.start) > -1) {
       const [settings, events] = await Promise.all([
         this.settingsService.getByUserId(userId),
-        this.mealEventService.getTodayEvents(),
+        this.mealEventService.getTodayEvents(userId),
       ])
 
       const isNeedToUseSettigns = !settings?.mealsCountPerDay
