@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common'
 import { UserEntity } from 'src/entities'
+import { AnalyticsModule } from 'src/services/analytics'
 import { MealEventModule } from '../mealEvent'
 import { SettingsModule } from '../settings'
 import { WelcomeScenario, MealScenario, MealEventsSchedule, MealNotification, ScenariosStorage } from './scenarios'
@@ -9,7 +10,7 @@ import { TelegramListener } from './telegram.listener'
 import { TelegramService } from './telegram.service'
 
 @Module({
-  imports: [MealEventModule, SettingsModule],
+  imports: [MealEventModule, SettingsModule, AnalyticsModule],
   controllers: [],
   providers: [
     // Entities

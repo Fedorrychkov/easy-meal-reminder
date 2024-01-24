@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import * as TelegramBot from 'node-telegram-bot-api'
 import { baseCommands, settingsMealsCommands } from 'src/modules/telegram/commands'
 import { TelegramService } from 'src/modules/telegram/telegram.service'
@@ -12,17 +12,20 @@ import { SettingsService } from 'src/modules/settings'
 import { MealEventService } from 'src/modules/mealEvent'
 import { MESSAGES } from 'src/messages'
 import { interpolate } from 'src/helpers'
+import { AnalyticsService } from 'src/services/analytics'
 
 @Injectable()
 export class WelcomeScenario implements IScenarioInstance {
   messageHandlers: TelegramMessageHandlerType[]
   public entity = StorageEntity.welcome
+  private logger = new Logger(WelcomeScenario.name)
 
   constructor(
     private readonly telegramService: TelegramService,
     private readonly userEntity: UserEntity,
     private readonly settingsService: SettingsService,
     private readonly mealEventService: MealEventService,
+    private readonly analyticsService: AnalyticsService,
   ) {
     this.messageHandlers = [this.welcomeStart.bind(this)]
   }
@@ -48,6 +51,36 @@ ${welcomeFinish}
     `
 
     return finalText
+  }
+
+  private async checkFromRedirect(user: UserDocument, message: TelegramBot.Message, from: string) {
+    const target = from?.replace('from_', '')
+
+    this.logger.log(
+      `Новый пользователь с ${message?.from?.id} и никнеймом @${message?.from?.username} пришел из ${target}`,
+    )
+
+    this.analyticsService.trackEvent(`Target_from_${target.toLowerCase()}`, {
+      eventOptions: { user_id: `${message?.from?.id}`, target },
+    })
+  }
+
+  private async startWithParams(user: UserDocument, message: TelegramBot.Message) {
+    if (user) {
+      return
+    }
+
+    this.analyticsService.trackEvent('Signup', { eventOptions: { user_id: `${message?.from?.id}` } })
+
+    const text = message?.text?.replace(/\/start /gi, '')
+
+    const isValidFrom = /^from/gi.test(text || '')
+
+    this.checkFromRedirect(user, message, text)
+
+    if (!isValidFrom) {
+      return
+    }
   }
 
   private async welcomeStart(message: TelegramBot.Message) {
@@ -76,6 +109,8 @@ ${welcomeFinish}
     }
 
     if (message?.text?.indexOf(WelcomeMessagesIncoming.start) > -1) {
+      this.startWithParams(user, message)
+
       const [settings, events] = await Promise.all([
         this.settingsService.getByUserId(userId),
         this.mealEventService.getTodayEvents(userId),

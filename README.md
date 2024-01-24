@@ -12,6 +12,9 @@ add package global `npm install -g firebase-tools` and use `firebase init` after
 ## Manage indexes
 Your indexes saved in firebase.indexes.json and you can use command `firebase deploy --only firestore:indexes` for deploy it.
 
+## Analytics
+Try tu use amplitude analytics. Currently use [amplitude dashboard](https://app.amplitude.com/analytics/meal-reminder/home) for me
+
 ## Description
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
