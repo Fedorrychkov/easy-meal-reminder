@@ -22,7 +22,7 @@ export class MealEventsSchedule {
 
   private notificationMealSended = new Map<string, boolean>()
   private notificationMealStartSended = new Map<string, number[]>()
-  private notificationMealCountPerDatSended = new Map<string, number>()
+  private notificationMealCountPerDateSended = new Map<string, number>()
   private notificationContinueSettingsInstallement = new Map<string, number>()
 
   constructor(
@@ -171,7 +171,11 @@ export class MealEventsSchedule {
         const reminderPeriodInMinutes = difference / settings?.mealsCountPerDay
         const [lastEvent] = reversedEvents
 
-        const key = `${user.id}-${lastEvent.id}-${lastEvent.status}`
+        const lastTime = (lastEvent?.updatedAt as any)?._seconds || (lastEvent?.createdAt as any)?._seconds
+        const diff = Math.round(time.unix(lastTime).tz('Europe/Moscow').diff(time().tz('Europe/Moscow')) / 1000)
+        const minutes = Math.floor(diff / 60)
+
+        const key = `${user.id}-${lastEvent.id}-${lastEvent.status}-${lastTime}`
         const isSended = this.notificationMealSended.get(key) || false
 
         if (isSended) {
@@ -187,10 +191,6 @@ export class MealEventsSchedule {
 
         const isLastSkipped = lastEvent && lastEvent?.status === MealEventStatus.SKIPPED
 
-        const lastTime = (lastEvent?.updatedAt as any)?._seconds || (lastEvent?.createdAt as any)?._seconds
-        const diff = Math.round(time.unix(lastTime).tz('Europe/Moscow').diff(time().tz('Europe/Moscow')) / 1000)
-        const minutes = Math.floor(diff / 60)
-
         // слева - если осталось меньше чем nextMealReminderStandartPeriodInMinute, то отправляем уведомление о следующем приеме
         // справа - если осталось прошло больше чем continueSkippedMealPeriodInMinute, то отправляем уведомление об отложенном приеме
         const isNeedToSend = !isLastSkipped
@@ -205,7 +205,7 @@ export class MealEventsSchedule {
               reminderPeriodInMinutes,
               isLastSkipped,
               diff: minutes - -reminderPeriodInMinutes,
-              skippedDiff: minutes - -continueSkippedMealPeriodInMinute < 0,
+              skippedDiff: minutes - -continueSkippedMealPeriodInMinute,
             },
           )
         }
@@ -314,7 +314,7 @@ export class MealEventsSchedule {
 
     const difference = this.settingsHelper.tryToGetPeriodDifferenceInMinutes({ from, to })
 
-    if (lastTodayNotification && difference > startMealPeriodInMinutes) {
+    if (lastTodayNotification && difference < startMealPeriodInMinutes) {
       this.logger.log(
         `[sendMealStartNotification]: Пользователь ${user.id} с ником ${user.username} с последнего уведомления прошло ${difference} минут`,
       )
@@ -349,7 +349,7 @@ export class MealEventsSchedule {
 
     const key = `${user.id}-${currentDate}`
 
-    const lastTodayNotification = this.notificationMealCountPerDatSended.get(key)
+    const lastTodayNotification = this.notificationMealCountPerDateSended.get(key)
 
     if (lastTodayNotification) {
       this.logger.log(
@@ -365,7 +365,7 @@ export class MealEventsSchedule {
       settingsMealsCommands,
     )
 
-    this.notificationMealCountPerDatSended.set(key, currentDateInstance.valueOf())
+    this.notificationMealCountPerDateSended.set(key, currentDateInstance.valueOf())
 
     return true
   }
