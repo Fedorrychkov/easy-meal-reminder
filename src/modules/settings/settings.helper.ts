@@ -15,43 +15,48 @@ export class SettingsHelper {
   }
 
   public tryToParsePeriodUserText(text: string): PeriodTime {
-    const period = text?.split('-')
+    try {
+      const period = text?.split('-')
 
-    if (period?.length < 2) {
-      throw new Error(MESSAGES.settings.errors.separator)
-    }
+      if (period?.length < 2) {
+        throw new Error(MESSAGES.settings.errors.separator)
+      }
 
-    const parsedValues = period?.map((item) => {
-      const hAndM = item?.split(':')
+      const parsedValues = period?.map((item) => {
+        const hAndM = item?.split(':')
 
-      const [h, m = 0] = hAndM?.map((hAndMItem) => {
-        const result = parseInt(hAndMItem)
+        const [h, m = 0] = hAndM?.map((hAndMItem) => {
+          const result = parseInt(hAndMItem)
 
-        if (hAndMItem && Number.isNaN(result)) {
-          throw new Error(MESSAGES.settings.errors.separator)
+          if (hAndMItem && Number.isNaN(result)) {
+            throw new Error(MESSAGES.settings.errors.separator)
+          }
+
+          return result
+        })
+
+        if (h < 0 || h > 23) {
+          throw new Error(MESSAGES.settings.errors.hourPeriod)
         }
 
-        return result
+        if (m && (m < 0 || m > 59)) {
+          throw new Error(MESSAGES.settings.errors.minutePeriod)
+        }
+
+        return { h, m }
       })
 
-      if (h < 0 || h > 23) {
-        throw new Error(MESSAGES.settings.errors.hourPeriod)
+      const [from, to] = parsedValues
+
+      if (from.h === to.h) {
+        throw new Error(MESSAGES.settings.errors.hourEqualityError)
       }
 
-      if (m && (m < 0 || m > 59)) {
-        throw new Error(MESSAGES.settings.errors.minutePeriod)
-      }
-
-      return { h, m }
-    })
-
-    const [from, to] = parsedValues
-
-    if (from.h === to.h) {
-      throw new Error(MESSAGES.settings.errors.hourEqualityError)
+      return { from, to }
+    } catch (error) {
+      this.logger.error(`[tryToParsePeriodUserText]: Error with text=${text}`, error)
+      throw error
     }
-
-    return { from, to }
   }
 
   public tryToGetDifferenceAndParsedPeriod(text: string) {
