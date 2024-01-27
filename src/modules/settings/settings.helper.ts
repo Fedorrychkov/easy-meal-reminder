@@ -55,6 +55,7 @@ export class SettingsHelper {
       return { from, to }
     } catch (error) {
       this.logger.error(`[tryToParsePeriodUserText]: Error with text=${text}`, error)
+
       throw error
     }
   }
