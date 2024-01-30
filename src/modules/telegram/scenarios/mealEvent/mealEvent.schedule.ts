@@ -314,9 +314,13 @@ export class MealEventsSchedule {
 
     const difference = this.settingsHelper.tryToGetPeriodDifferenceInMinutes({ from, to })
 
-    if (lastTodayNotification && difference > startMealPeriodInMinutes) {
+    if (lastTodayNotification && difference < startMealPeriodInMinutes) {
       this.logger.log(
         `[sendMealStartNotification]: Пользователь ${user.id} с ником ${user.username} с последнего уведомления прошло ${difference} минут`,
+        {
+          difference,
+          lastTodayNotification,
+        },
       )
 
       return false
